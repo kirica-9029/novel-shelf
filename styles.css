@@ -425,8 +425,46 @@ textarea {
   gap: 12px;
 }
 
-.catalog-card .muted {
+.catalog-add-button {
+  width: 100%;
+}
+
+.catalog-main {
+  min-width: 0;
+}
+
+.catalog-author {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 8px;
+}
+
+.catalog-story {
+  display: -webkit-box;
+  margin: 8px 0 0;
+  color: var(--text);
+  font-size: 0.92rem;
+  overflow: hidden;
   overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.catalog-card.is-story-open .catalog-story {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
+
+.story-toggle {
+  margin-top: 6px;
 }
 
 .ranking-item {
@@ -641,6 +679,10 @@ textarea {
   .catalog-card {
     grid-template-columns: 1fr auto;
     align-items: center;
+  }
+
+  .catalog-add-button {
+    width: auto;
   }
 
   .url-register {

@@ -644,7 +644,7 @@ async function fetchNarouNovels(keyword) {
   const data = await requestNarouApi({
     word: keyword,
     lim: "20",
-    of: "t-n-w-s-gl-ga",
+    of: "t-n-w-s-g-k-gl-ga",
   });
   return parseNarouApiResults(data);
 }
@@ -653,7 +653,7 @@ async function fetchNarouNovelsByNcodes(ncodes) {
   const data = await requestNarouApi({
     ncode: ncodes.join("-").toLowerCase(),
     lim: String(ncodes.length),
-    of: "t-n-w-s-gl-ga",
+    of: "t-n-w-s-g-k-gl-ga",
   });
   return parseNarouApiResults(data);
 }
@@ -725,6 +725,8 @@ function normalizeNarouNovel(item) {
     generalAllNo,
     latestChapter: generalAllNo,
     story: item.story || "",
+    genre: item.genre || "",
+    keyword: item.keyword || "",
     lastup: generalLastup,
   };
 }
@@ -760,19 +762,25 @@ function getCatalogErrorMessage(error) {
 
 function renderCatalogCard(item) {
   const alreadyAdded = Boolean(findDuplicateNovel(item));
+  const chips = getNarouMetaChips(item).map((chip) => `<span class="tag-chip">${escapeHtml(chip)}</span>`).join("");
+  const storyId = `story-${escapeHtml(item.id)}`;
 
   return `
     <article class="catalog-card">
-      <div>
+      <div class="catalog-main">
         <p class="ranking-source">${escapeHtml(item.site)}</p>
         <h3 class="novel-title">${escapeHtml(item.title)}</h3>
-        <p class="muted">作者：${escapeHtml(item.writer)}</p>
-        <p class="muted">${escapeHtml(item.story)}</p>
+        <p class="catalog-author">作者：${escapeHtml(item.writer)}</p>
         <div class="meta-row">
-          <span class="badge">最終更新 ${escapeHtml(item.lastup || "不明")}</span>
           <span class="badge">話数 ${item.latestChapter || 0}</span>
+          <span class="badge">最終更新 ${escapeHtml(item.lastup || "不明")}</span>
           <a class="text-button" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">作品URL</a>
         </div>
+        ${chips ? `<div class="tag-row">${chips}</div>` : ""}
+        <p class="catalog-story" id="${storyId}">${escapeHtml(item.story || "あらすじはありません。")}</p>
+        <button class="text-button story-toggle" type="button" data-story-toggle="${item.id}" aria-expanded="false" aria-controls="${storyId}">
+          あらすじを開く
+        </button>
       </div>
       <button class="primary-button catalog-add-button" type="button" data-catalog-id="${item.id}" ${alreadyAdded ? "disabled" : ""}>
         ${alreadyAdded ? "登録済み" : "本棚に追加"}
@@ -781,10 +789,30 @@ function renderCatalogCard(item) {
   `;
 }
 
+function getNarouMetaChips(item) {
+  return [item.genre, item.keyword]
+    .filter(Boolean)
+    .flatMap((value) => String(value).split(/\s+/))
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
 function bindCatalogActions() {
   elements.catalogResults.querySelectorAll("[data-catalog-id]").forEach((button) => {
     button.addEventListener("click", () => addCatalogNovel(button.dataset.catalogId));
   });
+  elements.catalogResults.querySelectorAll("[data-story-toggle]").forEach((button) => {
+    button.addEventListener("click", () => toggleCatalogStory(button));
+  });
+}
+
+function toggleCatalogStory(button) {
+  const card = button.closest(".catalog-card");
+  const expanded = button.getAttribute("aria-expanded") === "true";
+  button.setAttribute("aria-expanded", String(!expanded));
+  card.classList.toggle("is-story-open", !expanded);
+  button.textContent = expanded ? "あらすじを開く" : "あらすじを閉じる";
 }
 
 function addCatalogNovel(catalogId) {
