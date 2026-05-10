@@ -8,6 +8,11 @@ const rankingSeed = [
   { title: "もしも英雄科に編入したら", site: "ハーメルン", genre: "二次創作", score: 7900 },
   { title: "辺境都市の図書館長", site: "小説家になろう", genre: "異世界", score: 7460 },
   { title: "放課後タイムリープ相談室", site: "カクヨム", genre: "現代", score: 6980 },
+  { title: "古き掲示板の竜騎士", site: "Arcadia", genre: "異世界", score: 6740 },
+  { title: "暁に響く航宙譚", site: "暁", genre: "SF", score: 6410 },
+  { title: "ノベラの街角食堂", site: "ノベルアップ+", genre: "現代", score: 6180 },
+  { title: "放課後イラストノベル", site: "pixiv小説", genre: "現代", score: 5870 },
+  { title: "夜想の迷宮記録", site: "ノクターン", genre: "異世界", score: 5520 },
 ];
 
 const state = {
