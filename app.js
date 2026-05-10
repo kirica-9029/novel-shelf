@@ -482,6 +482,15 @@ function extractNarouNcode(url) {
 
 function extractSourceInfoFromUrl(url) {
   const target = String(url || "").trim();
+  const nocturne = target.match(/noc\.syosetu\.com\/(n\d{4}[a-z]+)\/(?:(\d+)\/?)?/i);
+  if (nocturne) {
+    return {
+      site: "nocturne",
+      workId: normalizeNcode(nocturne[1]),
+      episodeNo: nocturne[2] ? Number(nocturne[2]) : 0,
+    };
+  }
+
   const narou = target.match(/ncode\.syosetu\.com\/(n\d{4}[a-z]+)\/(?:(\d+)\/?)?/i);
   if (narou) {
     return {
@@ -507,6 +516,42 @@ function extractSourceInfoFromUrl(url) {
       workId: hameln[1],
       novelId: hameln[1],
       episodeNo: hameln[2] ? Number(hameln[2]) : 0,
+    };
+  }
+
+  const arcadia = target.match(/mai-net\.net\/bbs\/sst\/sst\.php\?[^#]*\ball=(\d+)(?:[^#]*\bn=(\d+))?/i);
+  if (arcadia) {
+    return {
+      site: "arcadia",
+      workId: arcadia[1],
+      episodeNo: arcadia[2] ? Number(arcadia[2]) : 0,
+    };
+  }
+
+  const akatsuki = target.match(/akatsuki-novels\.com\/stories\/view\/(\d+)\/novel_id~(\d+)/i);
+  if (akatsuki) {
+    return {
+      site: "akatsuki",
+      workId: akatsuki[2],
+      episodeId: akatsuki[1],
+    };
+  }
+
+  const pixiv = target.match(/pixiv\.net\/novel\/show\.php\?[^#]*\bid=(\d+)/i);
+  if (pixiv) {
+    return {
+      site: "pixiv",
+      workId: pixiv[1],
+      episodeId: pixiv[1],
+    };
+  }
+
+  const novelup = target.match(/novelup\.plus\/story\/([^/?#]+)/i);
+  if (novelup) {
+    return {
+      site: "novelup",
+      workId: novelup[1],
+      episodeId: novelup[1],
     };
   }
 
@@ -659,16 +704,17 @@ function applyBookmarkletRead(payload) {
 }
 
 function isSupportedBookmarkletPayload(payload) {
-  if (payload.site === "narou") return Boolean(normalizeNcode(payload.workId || payload.ncode) && payload.episodeNo);
-  if (payload.site === "kakuyomu") return Boolean(payload.workId && payload.episodeId);
+  if (["narou", "nocturne"].includes(payload.site)) return Boolean(normalizeNcode(payload.workId || payload.ncode) && payload.episodeNo);
+  if (["kakuyomu", "akatsuki", "pixiv", "novelup"].includes(payload.site)) return Boolean(payload.workId && payload.episodeId);
   if (payload.site === "hameln") return Boolean((payload.novelId || payload.workId) && payload.episodeNo);
+  if (payload.site === "arcadia") return Boolean(payload.workId && payload.sourceUrl.includes("n="));
   return false;
 }
 
 function findNovelByBookmarkletPayload(payload) {
-  if (payload.site === "narou") {
+  if (["narou", "nocturne"].includes(payload.site)) {
     const ncode = normalizeNcode(payload.workId || payload.ncode);
-    return state.novels.find((novel) => normalizeNcode(novel.ncode || novel.workId) === ncode);
+    return state.novels.find((novel) => normalizeNcode(novel.ncode || novel.workId) === ncode || normalizeUrl(novel.url).includes(ncode.toLowerCase()));
   }
   if (payload.site === "kakuyomu") {
     return state.novels.find((novel) => novel.site === "カクヨム" && (novel.workId === payload.workId || normalizeUrl(novel.url).includes(`/works/${payload.workId}`)));
@@ -677,7 +723,19 @@ function findNovelByBookmarkletPayload(payload) {
     const novelId = payload.novelId || payload.workId;
     return state.novels.find((novel) => novel.site === "ハーメルン" && (novel.novelId === novelId || novel.workId === novelId || normalizeUrl(novel.url).includes(`/novel/${novelId}`)));
   }
+  if (payload.site === "arcadia") return findExternalNovelBySiteAndWork("Arcadia", payload.workId, "all=");
+  if (payload.site === "akatsuki") return findExternalNovelBySiteAndWork("暁", payload.workId, "novel_id~");
+  if (payload.site === "pixiv") return findExternalNovelBySiteAndWork("pixiv小説", payload.workId, "id=");
+  if (payload.site === "novelup") return findExternalNovelBySiteAndWork("ノベルアップ+", payload.workId, "/story/");
   return null;
+}
+
+function findExternalNovelBySiteAndWork(site, workId, urlNeedle) {
+  return state.novels.find((novel) => novel.site === site && (
+    novel.workId === workId ||
+    novel.episodeId === workId ||
+    normalizeUrl(novel.url).includes(`${urlNeedle}${String(workId).toLowerCase()}`)
+  ));
 }
 
 function updateNovelReadFromBookmarklet(targetNovel, payload) {
@@ -685,7 +743,7 @@ function updateNovelReadFromBookmarklet(targetNovel, payload) {
   state.novels = state.novels.map((novel) => {
     if (novel.id !== targetNovel.id) return novel;
 
-    if (payload.site === "kakuyomu") {
+    if (payload.episodeId && !payload.episodeNo) {
       return {
         ...novel,
         workId: payload.workId,
@@ -737,6 +795,11 @@ function createBookmarkletHref() {
       const sourceUrl = location.href;
       const patterns = [
         {
+          site: "nocturne",
+          match: sourceUrl.match(/noc\\.syosetu\\.com\\/(n\\d{4}[a-z]+)\\/(\\d+)\\/?/i),
+          build: (m) => ({ site: "nocturne", workId: m[1].toUpperCase(), ncode: m[1].toUpperCase(), episodeNo: m[2] })
+        },
+        {
           site: "narou",
           match: sourceUrl.match(/ncode\\.syosetu\\.com\\/(n\\d{4}[a-z]+)\\/(\\d+)\\/?/i),
           build: (m) => ({ site: "narou", workId: m[1].toUpperCase(), ncode: m[1].toUpperCase(), episodeNo: m[2] })
@@ -750,6 +813,26 @@ function createBookmarkletHref() {
           site: "hameln",
           match: sourceUrl.match(/syosetu\\.org\\/novel\\/(\\d+)\\/(\\d+)(?:\\.html|\\/)?/i),
           build: (m) => ({ site: "hameln", workId: m[1], novelId: m[1], episodeNo: m[2] })
+        },
+        {
+          site: "arcadia",
+          match: sourceUrl.match(/mai-net\\.net\\/bbs\\/sst\\/sst\\.php\\?[^#]*\\ball=(\\d+)(?:[^#]*\\bn=(\\d+))?/i),
+          build: (m) => ({ site: "arcadia", workId: m[1], episodeNo: m[2] || "0" })
+        },
+        {
+          site: "akatsuki",
+          match: sourceUrl.match(/akatsuki-novels\\.com\\/stories\\/view\\/(\\d+)\\/novel_id~(\\d+)/i),
+          build: (m) => ({ site: "akatsuki", workId: m[2], episodeId: m[1] })
+        },
+        {
+          site: "pixiv",
+          match: sourceUrl.match(/pixiv\\.net\\/novel\\/show\\.php\\?[^#]*\\bid=(\\d+)/i),
+          build: (m) => ({ site: "pixiv", workId: m[1], episodeId: m[1] })
+        },
+        {
+          site: "novelup",
+          match: sourceUrl.match(/novelup\\.plus\\/story\\/([^/?#]+)/i),
+          build: (m) => ({ site: "novelup", workId: m[1], episodeId: m[1] })
         }
       ];
       const matched = patterns.find((item) => item.match);
