@@ -105,6 +105,7 @@ function cacheElements() {
     libraryEmpty: document.querySelector("#libraryEmpty"),
     updatesList: document.querySelector("#updatesList"),
     updatesEmpty: document.querySelector("#updatesEmpty"),
+    updatesSummary: document.querySelector("#updatesSummary"),
     markAllRead: document.querySelector("#markAllRead"),
     rankingControls: document.querySelector("#rankingControls"),
     rankingPeriodButtons: document.querySelectorAll("[data-ranking-period]"),
@@ -280,6 +281,8 @@ function createNovel(values) {
     readChapter,
     latest: formatChapter(latestChapter),
     position: formatChapter(readChapter),
+    lastOpenedChapter: toChapterNumber(values.lastOpenedChapter),
+    lastViewedAt: values.lastViewedAt || "",
     memo: values.memo || "",
     unread: Boolean(values.unread),
     updatedAt: new Date().toISOString(),
@@ -438,6 +441,8 @@ function sanitizeNovel(novel) {
     readChapter,
     latest: formatChapter(latestChapter),
     position: formatChapter(readChapter),
+    lastOpenedChapter: toChapterNumber(novel.lastOpenedChapter),
+    lastViewedAt: novel.lastViewedAt || "",
     memo: String(novel.memo || "").trim(),
     unread: Boolean(novel.unread) || hasUnreadChapters({ latestChapter, readChapter }),
     updatedAt: novel.updatedAt || new Date().toISOString(),
@@ -568,6 +573,8 @@ function renderLibrary() {
 
 function renderUpdates() {
   const updates = getUpdatedNovels();
+  elements.updatesSummary.classList.toggle("is-hidden", updates.length === 0);
+  elements.updatesSummary.innerHTML = renderUpdatesSummary(updates);
   elements.updatesEmpty.classList.toggle("is-hidden", updates.length > 0);
   elements.updatesList.innerHTML = updates.map(renderUpdateCard).join("");
   bindCardActions(elements.updatesList);
@@ -576,13 +583,33 @@ function renderUpdates() {
 function getUpdatedNovels() {
   return state.novels
     .filter((novel) => novel.unread)
-    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    .sort(compareByUpdateDate);
+}
+
+function compareByUpdateDate(a, b) {
+  return getTimestamp(b.updatedAt) - getTimestamp(a.updatedAt);
+}
+
+function getTimestamp(value) {
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function renderUpdatesSummary(updates) {
+  const totalDiff = updates.reduce((sum, novel) => sum + getUnreadChapterCount(novel), 0);
+  return `
+    <span class="badge unread">NEW ${updates.length}件</span>
+    <span class="badge">未読 ${totalDiff}話</span>
+    <span class="muted">更新順で巡回できます</span>
+  `;
 }
 
 function renderUpdateCard(novel) {
   const unreadCount = getUnreadChapterCount(novel);
+  const nextChapter = getNextReadableChapter(novel);
+  const diffText = getUpdateDiffText(novel, unreadCount);
   const continueButton = novel.url
-    ? `<a class="text-button" href="${escapeHtml(novel.url)}" target="_blank" rel="noopener">続きから読む</a>`
+    ? renderContinueLink(novel)
     : "";
 
   return `
@@ -590,16 +617,21 @@ function renderUpdateCard(novel) {
       <div class="update-main">
         <div class="update-title-row">
           <span class="new-label">NEW</span>
-          <h3 class="novel-title">${escapeHtml(novel.title)}</h3>
+          <div>
+            <h3 class="novel-title">${escapeHtml(novel.title)}</h3>
+            <p class="update-time">最終更新：${escapeHtml(formatUpdatedAt(novel.updatedAt))}</p>
+          </div>
         </div>
         <div class="meta-row">
           <span class="badge">${escapeHtml(novel.site)}</span>
           ${novel.latestChapter ? `<span class="badge">更新 ${novel.latestChapter}話</span>` : ""}
           ${unreadCount ? `<span class="badge unread">未読 ${unreadCount}話</span>` : ""}
+          <span class="badge">次 ${nextChapter}話</span>
         </div>
-        <p class="update-time">更新日時：${escapeHtml(formatUpdatedAt(novel.updatedAt))}</p>
+        <p class="update-diff">${escapeHtml(diffText)}</p>
+        ${novel.lastViewedAt ? `<p class="update-time">最終閲覧：${escapeHtml(formatUpdatedAt(novel.lastViewedAt))}</p>` : ""}
       </div>
-      <div class="card-actions">
+      <div class="card-actions update-actions">
         ${continueButton}
         <button class="text-button" type="button" data-action="read">既読</button>
         <button class="text-button" type="button" data-action="edit">編集</button>
@@ -608,12 +640,19 @@ function renderUpdateCard(novel) {
   `;
 }
 
+function getUpdateDiffText(novel, unreadCount) {
+  if (!novel.latestChapter) return "更新話数は未設定です";
+  if (unreadCount > 0) return `${novel.readChapter}話から${novel.latestChapter}話まで、${unreadCount}話分の更新があります`;
+  return `${novel.latestChapter}話まで確認済みです`;
+}
+
 function renderNovelCard(novel) {
   const urlButton = novel.url
-    ? `<a class="text-button" href="${escapeHtml(novel.url)}" target="_blank" rel="noopener">続きから読む</a>`
+    ? renderContinueLink(novel)
     : "";
   const unreadCount = getUnreadChapterCount(novel);
   const progressText = getProgressText(novel, unreadCount);
+  const viewedText = getViewedText(novel);
 
   return `
     <article class="novel-card" data-id="${novel.id}">
@@ -629,6 +668,7 @@ function renderNovelCard(novel) {
         </div>
       </div>
       ${progressText ? `<p class="muted">${escapeHtml(progressText)}</p>` : ""}
+      ${viewedText ? `<p class="muted">${escapeHtml(viewedText)}</p>` : ""}
       ${novel.memo ? `<p>${escapeHtml(novel.memo)}</p>` : ""}
       <div class="card-actions">
         ${urlButton}
@@ -641,6 +681,15 @@ function renderNovelCard(novel) {
   `;
 }
 
+function renderContinueLink(novel) {
+  const chapter = getNextReadableChapter(novel);
+  return `
+    <a class="text-button" href="${escapeHtml(getContinueUrl(novel, chapter))}" target="_blank" rel="noopener" data-action="continue">
+      続きから読む
+    </a>
+  `;
+}
+
 function getUnreadChapterCount(novel) {
   return Math.max(0, Number(novel.latestChapter || 0) - Number(novel.readChapter || 0));
 }
@@ -650,6 +699,12 @@ function getProgressText(novel, unreadCount) {
   if (unreadCount > 0) return `未読 ${unreadCount}話（${novel.readChapter}話 → ${novel.latestChapter}話）`;
   if (novel.readChapter > 0) return `最新話まで読了済み（${novel.readChapter}話）`;
   return `更新話数：${novel.latestChapter}話`;
+}
+
+function getViewedText(novel) {
+  if (!novel.lastViewedAt) return "";
+  const chapter = novel.lastOpenedChapter ? ` / 最後に開いた話：${novel.lastOpenedChapter}話` : "";
+  return `最終閲覧：${formatUpdatedAt(novel.lastViewedAt)}${chapter}`;
 }
 
 function formatUpdatedAt(value) {
@@ -683,6 +738,9 @@ function handleCardAction(button) {
     case "read":
       markNovelRead(novel);
       break;
+    case "continue":
+      saveReadingProgress(novel);
+      break;
     case "update":
       markNovelUpdated(novel);
       break;
@@ -697,6 +755,38 @@ function deleteNovel(novel) {
   state.novels = state.novels.filter((item) => item.id !== novel.id);
   saveState();
   render();
+}
+
+function saveReadingProgress(novel) {
+  const openedChapter = getNextReadableChapter(novel);
+  const readChapter = Math.max(novel.readChapter || 0, openedChapter);
+  const now = new Date().toISOString();
+
+  state.novels = state.novels.map((item) => {
+    if (item.id !== novel.id) return item;
+    return {
+      ...item,
+      readChapter,
+      position: formatChapter(readChapter),
+      lastOpenedChapter: openedChapter,
+      lastViewedAt: now,
+      unread: item.latestChapter > readChapter,
+    };
+  });
+  saveState();
+  window.setTimeout(render, 0);
+}
+
+function getNextReadableChapter(novel) {
+  const latestChapter = novel.latestChapter || 0;
+  const readChapter = novel.readChapter || 0;
+  if (!latestChapter) return readChapter || 1;
+  return Math.min(latestChapter, readChapter + 1 || 1);
+}
+
+function getContinueUrl(novel, chapter) {
+  // API連携時はここで作品IDと話数から正確な話URLを組み立てる。
+  return novel.url || SITE_HOME_URLS[novel.site] || "#";
 }
 
 function markNovelUpdated(novel) {
