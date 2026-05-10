@@ -209,19 +209,19 @@ body{font-family:var(--fn);color:var(--tx);background:transparent;font-size:14px
       <div class="nav-sec">
         <div class="nav-lbl">管理</div>
         <div class="nav-item" onclick="switchNav(this,'urls')"><i class="ti ti-link" aria-hidden="true"></i>URL登録</div>
-        <div class="nav-item" onclick="showToast('設定を開きます')"><i class="ti ti-settings" aria-hidden="true"></i>設定</div>
+        <div class="nav-item" onclick="switchNav(this,'settings')"><i class="ti ti-settings" aria-hidden="true"></i>設定</div>
       </div>
     </div>
     <div class="site-chips">
       <div class="site-chips-lbl">サイト絞込</div>
       <div class="site-grid">
-        <div class="site-chip on" onclick="toggleChip(this)">なろう</div>
-        <div class="site-chip on" onclick="toggleChip(this)">カクヨム</div>
-        <div class="site-chip on" onclick="toggleChip(this)">ハーメルン</div>
-        <div class="site-chip" onclick="toggleChip(this)">Arcadia</div>
-        <div class="site-chip" onclick="toggleChip(this)">暁</div>
-        <div class="site-chip on" onclick="toggleChip(this)">ノベルアップ+</div>
-        <div class="site-chip" onclick="toggleChip(this)">pixiv小説</div>
+        <div class="site-chip on" data-site="narou" onclick="toggleChip(this)">なろう</div>
+        <div class="site-chip on" data-site="kakuyomu" onclick="toggleChip(this)">カクヨム</div>
+        <div class="site-chip on" data-site="hameln" onclick="toggleChip(this)">ハーメルン</div>
+        <div class="site-chip" data-site="arcadia" onclick="toggleChip(this)">Arcadia</div>
+        <div class="site-chip" data-site="akatsuki" onclick="toggleChip(this)">暁</div>
+        <div class="site-chip on" data-site="novelup" onclick="toggleChip(this)">ノベルアップ+</div>
+        <div class="site-chip" data-site="pixiv" onclick="toggleChip(this)">pixiv小説</div>
       </div>
     </div>
   </div>
@@ -271,10 +271,10 @@ body{font-family:var(--fn);color:var(--tx);background:transparent;font-size:14px
           </div>
           <div class="search-filters">
             <span style="font-size:11px;color:var(--tx3);">サイト：</span>
-            <button class="site-filter-btn active" onclick="toggleSiteFilter(this,'narou')">なろう<span style="font-size:9px;margin-left:2px;background:#FFF0E0;color:#C05C00;padding:0 3px;border-radius:3px;">API</span></button>
-            <button class="site-filter-btn active" onclick="toggleSiteFilter(this,'kakuyomu')">カクヨム</button>
-            <button class="site-filter-btn" onclick="toggleSiteFilter(this,'hameln')">ハーメルン</button>
-            <button class="site-filter-btn" onclick="toggleSiteFilter(this,'novelup')">ノベルアップ+</button>
+            <button class="site-filter-btn active" data-site="narou" onclick="toggleSiteFilter(this,'narou')">なろう<span style="font-size:9px;margin-left:2px;background:#FFF0E0;color:#C05C00;padding:0 3px;border-radius:3px;">API</span></button>
+            <button class="site-filter-btn active" data-site="kakuyomu" onclick="toggleSiteFilter(this,'kakuyomu')">カクヨム</button>
+            <button class="site-filter-btn" data-site="hameln" onclick="toggleSiteFilter(this,'hameln')">ハーメルン</button>
+            <button class="site-filter-btn" data-site="novelup" onclick="toggleSiteFilter(this,'novelup')">ノベルアップ+</button>
             <select class="filter-sel" id="search-genre-sel">
               <option value="">ジャンル：すべて</option>
               <option value="異世界転生">異世界転生</option>
@@ -316,12 +316,12 @@ body{font-family:var(--fn);color:var(--tx);background:transparent;font-size:14px
           <div class="webview-bar">
             <button class="btn-icon" onclick="closeBrowse()" title="戻る"><i class="ti ti-arrow-left" aria-hidden="true"></i></button>
             <div class="webview-url" id="webview-url-bar"></div>
-            <button class="btn-icon" onclick="showToast('外部ブラウザで開きます')" title="外部で開く"><i class="ti ti-external-link" aria-hidden="true"></i></button>
+            <button class="btn-icon" onclick="openUrl(currentBrowseUrl)" title="外部で開く"><i class="ti ti-external-link" aria-hidden="true"></i></button>
           </div>
           <div class="webview-placeholder" style="flex:1;">
             <i class="ti ti-browser" aria-hidden="true" style="font-size:36px;"></i>
             <p id="webview-msg" style="font-size:13px;"></p>
-            <button class="btn-sm accent" onclick="showToast('外部ブラウザで開きます')" style="margin-top:6px;">ブラウザで開く <i class="ti ti-external-link" style="font-size:11px;"></i></button>
+            <button class="btn-sm accent" onclick="openUrl(currentBrowseUrl)" style="margin-top:6px;">ブラウザで開く <i class="ti ti-external-link" style="font-size:11px;"></i></button>
           </div>
         </div>
       </div>
@@ -360,6 +360,39 @@ body{font-family:var(--fn);color:var(--tx);background:transparent;font-size:14px
         <div id="url-list"></div>
       </div>
 
+      <!-- SETTINGS PANEL -->
+      <div id="panel-settings" class="panel">
+        <div class="filter-row" style="flex-direction:column;align-items:flex-start;gap:12px;">
+          <div class="field" style="width:100%;">
+            <div class="field-label">通知の有無</div>
+            <select id="setting-notifications" class="filter-sel" onchange="saveSettings()">
+              <option value="enabled">通知を受け取る</option>
+              <option value="disabled">通知を受け取らない</option>
+            </select>
+          </div>
+          <div class="field" style="width:100%;">
+            <div class="field-label">更新チェック間隔</div>
+            <select id="setting-interval" class="filter-sel" onchange="saveSettings()">
+              <option value="15分">15分ごと</option>
+              <option value="30分">30分ごと</option>
+              <option value="1時間">1時間ごと</option>
+              <option value="6時間">6時間ごと</option>
+            </select>
+          </div>
+          <div class="field" style="width:100%;">
+            <div class="field-label">リンクの開き方</div>
+            <select id="setting-link-mode" class="filter-sel" onchange="saveSettings()">
+              <option value="new_tab">新しいタブで開く</option>
+              <option value="same_tab">同じタブで開く</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:16px;padding:14px;background:var(--sur2);border:0.5px solid var(--bd);border-radius:var(--rl);">
+          <div style="font-size:13px;font-weight:700;margin-bottom:8px;">アプリ情報</div>
+          <div style="font-size:12px;color:var(--tx3);line-height:1.6;">この統合リーダーはリンク管理、更新通知、RSSチェック、URL登録をまとめた補助ツールです。スクレイピング規約に配慮し、外部ブラウザでコンテンツを開く方式を採用しています。</div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -368,8 +401,8 @@ body{font-family:var(--fn);color:var(--tx);background:transparent;font-size:14px
     <div class="modal">
       <div class="modal-title"><i class="ti ti-link" aria-hidden="true"></i> 作品URLを登録</div>
       <div class="field"><div class="field-label">URL</div><input type="url" id="url-input" placeholder="https://ncode.syosetu.com/..."></div>
-      <div class="field"><div class="field-label">カテゴリ</div><select><option>異世界転生</option><option>ファンタジー</option><option>恋愛</option><option>SF</option><option>その他</option></select></div>
-      <div class="field"><div class="field-label">通知設定</div><select><option>即時通知</option><option>1時間ごと</option><option>6時間ごと</option><option>通知しない</option></select></div>
+      <div class="field"><div class="field-label">カテゴリ</div><select id="url-category"><option>異世界転生</option><option>ファンタジー</option><option>恋愛</option><option>SF</option><option>その他</option></select></div>
+      <div class="field"><div class="field-label">通知設定</div><select id="url-notify"><option>即時通知</option><option>1時間ごと</option><option>6時間ごと</option><option>通知しない</option></select></div>
       <div class="modal-actions">
         <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
         <button class="btn-primary" onclick="addUrl()"><i class="ti ti-check" aria-hidden="true"></i> 登録する</button>
@@ -382,20 +415,61 @@ body{font-family:var(--fn);color:var(--tx);background:transparent;font-size:14px
 
 <script>
 const SITES={narou:{label:'なろう',cls:'tag-narou'},kakuyomu:{label:'カクヨム',cls:'tag-kakuyomu'},hameln:{label:'ハーメルン',cls:'tag-hameln'},arcadia:{label:'Arcadia',cls:'tag-arcadia'},akatsuki:{label:'暁',cls:'tag-akatsuki'},novelup:{label:'ノベルアップ+',cls:'tag-novelup'},pixiv:{label:'pixiv小説',cls:'tag-pixiv'}};
-function siteTag(s){const d=SITES[s];return`<span class="site-tag ${d.cls}">${d.label}</span>`;}
+function siteTag(s){const d=SITES[s]||{label:'外部',cls:'tag-narou'};return`<span class="site-tag ${d.cls}">${d.label}</span>`;}
+
+const DEFAULT_SETTINGS={notifications:'enabled',interval:'15分',linkMode:'new_tab'};
+let appSettings={...DEFAULT_SETTINGS};
+
+function loadSettings(){
+  try{
+    const saved=localStorage.getItem('novreaderSettings');
+    if(saved) appSettings=Object.assign({},DEFAULT_SETTINGS,JSON.parse(saved));
+  }catch(e){appSettings={...DEFAULT_SETTINGS};}
+  document.getElementById('setting-notifications').value=appSettings.notifications;
+  document.getElementById('setting-interval').value=appSettings.interval;
+  document.getElementById('setting-link-mode').value=appSettings.linkMode;
+}
+
+function saveSettings(){
+  appSettings={
+    notifications:document.getElementById('setting-notifications').value,
+    interval:document.getElementById('setting-interval').value,
+    linkMode:document.getElementById('setting-link-mode').value,
+  };
+  localStorage.setItem('novreaderSettings',JSON.stringify(appSettings));
+  showToast('設定を保存しました');
+}
+
+function openUrl(url){ if(!url) return; const target=appSettings.linkMode==='same_tab' ? '_self' : '_blank'; window.open(url,target); }
+
+function parseSiteFromUrl(url){
+  try{
+    const host=new URL(url).hostname;
+    if(host.includes('ncode.syosetu.com')||host.includes('syosetu.com')) return 'narou';
+    if(host.includes('kakuyomu.jp')) return 'kakuyomu';
+    if(host.includes('syosetu.org')||host.includes('hameln')) return 'hameln';
+    if(host.includes('mai-net.net')) return 'arcadia';
+    if(host.includes('akatsuki-novels.com')||host.includes('akatsuki')) return 'akatsuki';
+    if(host.includes('novelup.plus')) return 'novelup';
+    if(host.includes('pixiv.net')) return 'pixiv';
+  }catch(e){}
+  return 'narou';
+}
+
+function getSiteDisplay(url){return SITES[parseSiteFromUrl(url)]?.label||'外部';}
 
 const RANK_DATA={
   daily:[
-    {rank:1,title:'最強チート魔法師の英雄譚〜二度転生した少年は、前世の記憶で最強を目指す〜',author:'橘由華',genre:'異世界転生',tags:['チート','転生','魔法'],points:'24,810',bookmarks:'18,204',status:'連載中',emoji:'🧙'},
-    {rank:2,title:'ゴブリンスレイヤー外伝：年齢は剣の錆',author:'蝸牛くも',genre:'ファンタジー',tags:['剣と魔法','ダーク'],points:'19,332',bookmarks:'14,007',status:'連載中',emoji:'⚔️'},
-    {rank:3,title:'悪役令嬢は隣国の王子に溺愛される',author:'花山あかり',genre:'恋愛',tags:['乙女ゲー','悪役令嬢','溺愛'],points:'17,005',bookmarks:'21,883',status:'完結',emoji:'👑'},
-    {rank:4,title:'【書籍化決定】転生勇者は復讐を誓う',author:'白石新',genre:'異世界転生',tags:['復讐','転生','ダーク'],points:'14,220',bookmarks:'9,441',status:'連載中',emoji:'🗡️'},
-    {rank:5,title:'異世界でのんびり農家をやりたかった話',author:'田中一郎',genre:'ファンタジー',tags:['スローライフ','農業','ほのぼの'],points:'12,888',bookmarks:'8,901',status:'連載中',emoji:'🌾'},
-    {rank:6,title:'魔王城でおやすみ 二次創作SS集',author:'夢野つくし',genre:'現代ファンタジー',tags:['コメディ','短編'],points:'10,544',bookmarks:'5,332',status:'連載中',emoji:'🌙'},
-    {rank:7,title:'剣聖の娘は最弱と呼ばれたが',author:'鈴木花子',genre:'ファンタジー',tags:['成長','逆転','感動'],points:'9,771',bookmarks:'7,114',status:'連載中',emoji:'🌸'},
-    {rank:8,title:'AIと暮らす2099年の日常',author:'宇宙人A',genre:'SF',tags:['AI','近未来','日常'],points:'8,990',bookmarks:'6,220',status:'連載中',emoji:'🤖'},
-    {rank:9,title:'俺だけが知っている終末の秘密',author:'謎の作者',genre:'SF',tags:['ループ','ミステリ','SF'],points:'8,441',bookmarks:'4,880',status:'連載中',emoji:'🔮'},
-    {rank:10,title:'幽霊になった僕の初恋',author:'月野しずく',genre:'恋愛',tags:['ファンタジー恋愛','泣ける'],points:'7,990',bookmarks:'5,501',status:'完結',emoji:'👻'},
+    {rank:1,title:'最強チート魔法師の英雄譚〜二度転生した少年は、前世の記憶で最強を目指す〜',author:'橘由華',genre:'異世界転生',tags:['チート','転生','魔法'],points:'24,810',bookmarks:'18,204',status:'連載中',emoji:'🧙',site:'narou',url:'https://ncode.syosetu.com/n0001aa/'},
+    {rank:2,title:'ゴブリンスレイヤー外伝：年齢は剣の錆',author:'蝸牛くも',genre:'ファンタジー',tags:['剣と魔法','ダーク'],points:'19,332',bookmarks:'14,007',status:'連載中',emoji:'⚔️',site:'kakuyomu',url:'https://kakuyomu.jp/works/00000000000000001'},
+    {rank:3,title:'悪役令嬢は隣国の王子に溺愛される',author:'花山あかり',genre:'恋愛',tags:['乙女ゲー','悪役令嬢','溺愛'],points:'17,005',bookmarks:'21,883',status:'完結',emoji:'👑',site:'kakuyomu',url:'https://kakuyomu.jp/works/00000000000000002'},
+    {rank:4,title:'【書籍化決定】転生勇者は復讐を誓う',author:'白石新',genre:'異世界転生',tags:['復讐','転生','ダーク'],points:'14,220',bookmarks:'9,441',status:'連載中',emoji:'🗡️',site:'narou',url:'https://ncode.syosetu.com/n0002bb/'},
+    {rank:5,title:'異世界でのんびり農家をやりたかった話',author:'田中一郎',genre:'ファンタジー',tags:['スローライフ','農業','ほのぼの'],points:'12,888',bookmarks:'8,901',status:'連載中',emoji:'🌾',site:'novelup',url:'https://novelup.plus/work/00000000000000001'},
+    {rank:6,title:'魔王城でおやすみ 二次創作SS集',author:'夢野つくし',genre:'現代ファンタジー',tags:['コメディ','短編'],points:'10,544',bookmarks:'5,332',status:'連載中',emoji:'🌙',site:'arcadia',url:'https://www.mai-net.net/rank/'},
+    {rank:7,title:'剣聖の娘は最弱と呼ばれたが',author:'鈴木花子',genre:'ファンタジー',tags:['成長','逆転','感動'],points:'9,771',bookmarks:'7,114',status:'連載中',emoji:'🌸',site:'hameln',url:'https://syosetu.org/novel/12345/'},
+    {rank:8,title:'AIと暮らす2099年の日常',author:'宇宙人A',genre:'SF',tags:['AI','近未来','日常'],points:'8,990',bookmarks:'6,220',status:'連載中',emoji:'🤖',site:'pixiv',url:'https://www.pixiv.net/novel/show.php?id=00000001'},
+    {rank:9,title:'俺だけが知っている終末の秘密',author:'謎の作者',genre:'SF',tags:['ループ','ミステリ','SF'],points:'8,441',bookmarks:'4,880',status:'連載中',emoji:'🔮',site:'pixiv',url:'https://www.pixiv.net/novel/show.php?id=00000002'},
+    {rank:10,title:'幽霊になった僕の初恋',author:'月野しずく',genre:'恋愛',tags:['ファンタジー恋愛','泣ける'],points:'7,990',bookmarks:'5,501',status:'完結',emoji:'👻',site:'akatsuki',url:'https://www.akatsuki-novels.com/novel/12345/'},
   ]
 };
 RANK_DATA.weekly=RANK_DATA.daily.map((r,i)=>({...r,rank:i+1,points:(parseInt(r.points.replace(/,/g,''))*7).toLocaleString(),bookmarks:r.bookmarks}));
@@ -403,21 +477,23 @@ RANK_DATA.monthly=RANK_DATA.daily.map((r,i)=>({...r,rank:i+1,points:(parseInt(r.
 RANK_DATA.quarter=RANK_DATA.daily.map((r,i)=>({...r,rank:i+1,points:(parseInt(r.points.replace(/,/g,''))*84).toLocaleString()}));
 
 const SEARCH_DATA=[
-  {title:'最強チート魔法師の英雄譚',author:'橘由華',site:'narou',genre:'異世界転生',tags:['チート','転生'],desc:'前世の記憶を持つ少年が、二度目の人生で最強の魔法師を目指す異世界ファンタジー。圧倒的な力と仲間との絆が見どころ。',points:'24,810',bookmarks:'18,204',chapters:412,emoji:'🧙',added:false},
-  {title:'悪役令嬢は隣国の王子に溺愛される',author:'花山あかり',site:'kakuyomu',genre:'恋愛',tags:['乙女ゲー','悪役令嬢'],desc:'乙女ゲームの悪役令嬢に転生した主人公。破滅ルートを回避しようとするが、隣国の王子が予期せぬ行動に出て…。',points:'17,005',bookmarks:'21,883',chapters:201,emoji:'👑',added:false},
-  {title:'ゴブリンスレイヤー外伝：年齢は剣の錆',author:'蝸牛くも',site:'narou',genre:'ファンタジー',tags:['剣と魔法','ダーク'],desc:'若き冒険者たちが危険なダンジョンに挑む。甘くない世界観と緻密な戦闘描写が魅力の本格ファンタジー。',points:'19,332',bookmarks:'14,007',chapters:88,emoji:'⚔️',added:false},
-  {title:'異世界でのんびり農家をやりたかった話',author:'田中一郎',site:'narou',genre:'ファンタジー',tags:['スローライフ','農業'],desc:'最強の魔法師として異世界転生したのに、本人は農業がしたいだけ。ゆるくて癒されるスローライフファンタジー。',points:'12,888',bookmarks:'8,901',chapters:55,emoji:'🌾',added:false},
-  {title:'AIと暮らす2099年の日常',author:'宇宙人A',site:'kakuyomu',genre:'SF',tags:['AI','近未来'],desc:'汎用AIが普及した2099年。人間とAIの共存をユーモラスかつ哲学的に描く近未来SF日常系。',points:'8,990',bookmarks:'6,220',chapters:144,emoji:'🤖',added:false},
-  {title:'幽霊になった僕の初恋',author:'月野しずく',site:'hameln',genre:'恋愛',tags:['ファンタジー恋愛','泣ける'],desc:'突然幽霊になってしまった主人公が、自分の死の謎を解きながら初恋の相手と再会する切ない恋愛ファンタジー。',points:'7,990',bookmarks:'5,501',chapters:33,emoji:'👻',added:false},
+  {title:'最強チート魔法師の英雄譚',author:'橘由華',site:'narou',genre:'異世界転生',tags:['チート','転生'],desc:'前世の記憶を持つ少年が、二度目の人生で最強の魔法師を目指す異世界ファンタジー。圧倒的な力と仲間との絆が見どころ。',points:'24,810',bookmarks:'18,204',chapters:412,emoji:'🧙',added:false,url:'https://ncode.syosetu.com/n0001aa/'},
+  {title:'悪役令嬢は隣国の王子に溺愛される',author:'花山あかり',site:'kakuyomu',genre:'恋愛',tags:['乙女ゲー','悪役令嬢'],desc:'乙女ゲームの悪役令嬢に転生した主人公。破滅ルートを回避しようとするが、隣国の王子が予期せぬ行動に出て…。',points:'17,005',bookmarks:'21,883',chapters:201,emoji:'👑',added:false,url:'https://kakuyomu.jp/works/00000000000000002'},
+  {title:'ゴブリンスレイヤー外伝：年齢は剣の錆',author:'蝸牛くも',site:'narou',genre:'ファンタジー',tags:['剣と魔法','ダーク'],desc:'若き冒険者たちが危険なダンジョンに挑む。甘くない世界観と緻密な戦闘描写が魅力の本格ファンタジー。',points:'19,332',bookmarks:'14,007',chapters:88,emoji:'⚔️',added:false,url:'https://ncode.syosetu.com/n0002bb/'},
+  {title:'異世界でのんびり農家をやりたかった話',author:'田中一郎',site:'narou',genre:'ファンタジー',tags:['スローライフ','農業'],desc:'最強の魔法師として異世界転生したのに、本人は農業がしたいだけ。ゆるくて癒されるスローライフファンタジー。',points:'12,888',bookmarks:'8,901',chapters:55,emoji:'🌾',added:false,url:'https://ncode.syosetu.com/n0003cc/'},
+  {title:'AIと暮らす2099年の日常',author:'宇宙人A',site:'kakuyomu',genre:'SF',tags:['AI','近未来'],desc:'汎用AIが普及した2099年。人間とAIの共存をユーモラスかつ哲学的に描く近未来SF日常系。',points:'8,990',bookmarks:'6,220',chapters:144,emoji:'🤖',added:false,url:'https://kakuyomu.jp/works/00000000000000003'},
+  {title:'幽霊になった僕の初恋',author:'月野しずく',site:'hameln',genre:'恋愛',tags:['ファンタジー恋愛','泣ける'],desc:'突然幽霊になってしまった主人公が、自分の死の謎を解きながら初恋の相手と再会する切ない恋愛ファンタジー。',points:'7,990',bookmarks:'5,501',chapters:33,emoji:'👻',added:false,url:'https://syosetu.org/novel/12345/'},
 ];
 
 let currentRankType='daily';
 let activeSiteFilters=new Set(['narou','kakuyomu']);
+let currentBrowseUrl='';
 
 function renderRanking(){
   const genre=document.getElementById('rank-genre').value;
   let data=RANK_DATA[currentRankType];
   if(genre)data=data.filter(r=>r.genre===genre||r.tags.includes(genre));
+  data=data.filter(r=>activeSiteFilters.has(r.site));
   const list=document.getElementById('rank-list');
   list.innerHTML='';
   if(!data.length){list.innerHTML='<div class="no-results"><i class="ti ti-mood-empty"></i><p>該当作品なし</p></div>';return;}
@@ -440,8 +516,8 @@ function renderRanking(){
         <div><div class="stat-val">${r.points}</div><div class="stat-lbl">ポイント</div></div>
         <div><div class="stat-val" style="font-size:11px;color:var(--tx2)">${r.bookmarks}</div><div class="stat-lbl">ブックマーク</div></div>
         <div style="display:flex;gap:4px;margin-top:4px;">
-          <button class="open-btn" onclick="showToast('ブラウザで開きます')"><i class="ti ti-external-link" style="font-size:11px"></i>読む</button>
-          <button class="btn-sm" onclick="addToFavFromRank(this,'${r.emoji}','${r.title.replace(/'/g,"\\'")}')"><i class="ti ti-heart" style="font-size:11px"></i></button>
+          <button class="open-btn" onclick="openUrl('${r.url}')"><i class="ti ti-external-link" style="font-size:11px"></i>読む</button>
+          <button class="btn-sm" onclick="addToFavFromRank(this,'${r.emoji}','${r.title.replace(/'/g,"\\'")}', '${r.url}', '${r.site}')"><i class="ti ti-heart" style="font-size:11px"></i></button>
         </div>
       </div>`;
     list.appendChild(d);
@@ -455,7 +531,11 @@ function setRankType(btn,type){
   renderRanking();
 }
 
-function addToFavFromRank(btn,emoji,title){
+function addToFavFromRank(btn,emoji,title,url,site){
+  if(url && !favorites.some(f=>f.url===url)){
+    favorites.unshift({id:Date.now(),title,author:'不明',site:site||'narou',emoji:emoji||'📘',progress:0,hasNew:true,chapters:'?','url':url});
+    renderFavorites();
+  }
   btn.innerHTML='<i class="ti ti-check" style="font-size:11px"></i>';
   btn.style.background='var(--acc-lt)';
   btn.style.color='var(--acc)';
@@ -463,9 +543,23 @@ function addToFavFromRank(btn,emoji,title){
 }
 
 function toggleSiteFilter(btn,site){
-  btn.classList.toggle('active');
-  if(activeSiteFilters.has(site))activeSiteFilters.delete(site);
+  const isActive=activeSiteFilters.has(site);
+  if(isActive) activeSiteFilters.delete(site);
   else activeSiteFilters.add(site);
+  btn.classList.toggle('active');
+  updateSiteControls();
+  doSearch();
+}
+
+function updateSiteControls(){
+  document.querySelectorAll('.site-chip').forEach(el=>{
+    const site=el.dataset.site;
+    if(site) el.classList.toggle('on', activeSiteFilters.has(site));
+  });
+  document.querySelectorAll('.site-filter-btn').forEach(el=>{
+    const site=el.dataset.site;
+    if(site) el.classList.toggle('active', activeSiteFilters.has(site));
+  });
 }
 
 function doSearch(){
@@ -501,7 +595,7 @@ function doSearch(){
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;align-self:flex-start;">
-        <button class="open-btn" onclick="showToast('ブラウザで開きます')"><i class="ti ti-external-link" style="font-size:11px"></i>読む</button>
+        <button class="open-btn" onclick="openUrl('${r.url}')"><i class="ti ti-external-link" style="font-size:11px"></i>読む</button>
         <button class="add-fav-btn ${r.added?'added':''}" id="fav-btn-${idx}" onclick="toggleFavSearch(${idx},this)">
           <i class="ti ti-${r.added?'check':'heart'}" style="font-size:11px"></i>${r.added?'追加済み':'お気に入り'}
         </button>
@@ -519,12 +613,14 @@ function toggleFavSearch(idx,btn){
 }
 
 function openSite(site,url){
+  currentBrowseUrl=url;
   document.getElementById('browse-placeholder').style.display='none';
   const wv=document.getElementById('browse-webview');
   wv.classList.add('active');
   document.getElementById('webview-url-bar').textContent=url;
   const siteName=SITES[site]?.label||site;
-  document.getElementById('webview-msg').textContent=`${siteName}のページを外部ブラウザで開きます。\n「ブラウザで開く」ボタンを押してください。`;
+  document.getElementById('webview-msg').textContent=`${siteName}のページを外部ブラウザで開きます。`;
+  openUrl(url);
 }
 
 function closeBrowse(){
@@ -533,21 +629,21 @@ function closeBrowse(){
 }
 
 const notifications=[
-  {id:1,title:'転生したら最強の魔法使いだった件',chapter:'第412話　決戦の前夜',site:'narou',time:'3分前',unread:true},
-  {id:2,title:'俺だけレベルアップな件',chapter:'第88話　覚醒の瞬間',site:'kakuyomu',time:'27分前',unread:true},
-  {id:3,title:'乙女ゲーの悪役令嬢に転生したが全力で幸せになります',chapter:'第201話　王子の告白',site:'hameln',time:'1時間前',unread:true},
-  {id:4,title:'最強の魔剣士は平凡な日常を望む',chapter:'第55話　試練の塔',site:'novelup',time:'2時間前',unread:true},
-  {id:5,title:'冒険者になりたいと都に出て行った娘',chapter:'第144話　帰還',site:'narou',time:'3時間前',unread:true},
-  {id:6,title:'なろう系最強チート主人公が異世界で無双する話',chapter:'第1024話　宇宙の理',site:'kakuyomu',time:'5時間前',unread:true},
-  {id:7,title:'薬屋のひとりごと 二次創作版',chapter:'第33話　後宮の秘密',site:'arcadia',time:'昨日',unread:true},
-  {id:8,title:'蜘蛛ですが、なにか？ SS',chapter:'短編「転生後の日常」',site:'hameln',time:'昨日',unread:false},
+  {id:1,title:'転生したら最強の魔法使いだった件',chapter:'第412話　決戦の前夜',site:'narou',url:'https://ncode.syosetu.com/n0001aa/',time:'3分前',unread:true},
+  {id:2,title:'俺だけレベルアップな件',chapter:'第88話　覚醒の瞬間',site:'kakuyomu',url:'https://kakuyomu.jp/works/00000000000000001',time:'27分前',unread:true},
+  {id:3,title:'乙女ゲーの悪役令嬢に転生したが全力で幸せになります',chapter:'第201話　王子の告白',site:'hameln',url:'https://syosetu.org/novel/12345/',time:'1時間前',unread:true},
+  {id:4,title:'最強の魔剣士は平凡な日常を望む',chapter:'第55話　試練の塔',site:'novelup',url:'https://novelup.plus/work/00000000000000001',time:'2時間前',unread:true},
+  {id:5,title:'冒険者になりたいと都に出て行った娘',chapter:'第144話　帰還',site:'narou',url:'https://ncode.syosetu.com/n0003cc/',time:'3時間前',unread:true},
+  {id:6,title:'なろう系最強チート主人公が異世界で無双する話',chapter:'第1024話　宇宙の理',site:'kakuyomu',url:'https://kakuyomu.jp/works/00000000000000003',time:'5時間前',unread:true},
+  {id:7,title:'薬屋のひとりごと 二次創作版',chapter:'第33話　後宮の秘密',site:'arcadia',url:'https://www.mai-net.net/rank/',time:'昨日',unread:true},
+  {id:8,title:'蜘蛛ですが、なにか？ SS',chapter:'短編「転生後の日常」',site:'hameln',url:'https://syosetu.org/novel/54321/',time:'昨日',unread:false},
 ];
 
 const favorites=[
-  {id:1,title:'転生したら最強の魔法使いだった件',author:'白石新',site:'narou',emoji:'🧙',progress:82,hasNew:true,chapters:412},
-  {id:2,title:'俺だけレベルアップな件',author:'佐藤健太',site:'kakuyomu',emoji:'⚔️',progress:35,hasNew:true,chapters:88},
-  {id:3,title:'乙女ゲーの悪役令嬢に転生',author:'花山あかり',site:'hameln',emoji:'👑',progress:95,hasNew:false,chapters:201},
-  {id:4,title:'最強の魔剣士は平凡な日常を望む',author:'鈴木一郎',site:'novelup',emoji:'🗡️',progress:48,hasNew:true,chapters:55},
+  {id:1,title:'転生したら最強の魔法使いだった件',author:'白石新',site:'narou',emoji:'🧙',progress:82,hasNew:true,chapters:412,url:'https://ncode.syosetu.com/n4830bu/'},
+  {id:2,title:'俺だけレベルアップな件',author:'佐藤健太',site:'kakuyomu',emoji:'⚔️',progress:35,hasNew:true,chapters:88,url:'https://kakuyomu.jp/works/16816927860988352'},
+  {id:3,title:'乙女ゲーの悪役令嬢に転生',author:'花山あかり',site:'hameln',emoji:'👑',progress:95,hasNew:false,chapters:201,url:'https://syosetu.org/novel/12345/'},
+  {id:4,title:'最強の魔剣士は平凡な日常を望む',author:'鈴木一郎',site:'novelup',emoji:'🗡️',progress:48,hasNew:true,chapters:55,url:'https://novelup.plus/work/00000000000000001'},
 ];
 
 const readingPositions=[
@@ -579,7 +675,7 @@ function renderNotifications(){
         <div class="notif-title">${n.title}</div>
         <div class="notif-meta">${siteTag(n.site)}<span>${n.chapter}</span><span style="margin-left:auto">${n.time}</span></div>
         <div class="notif-action">
-          <button class="btn-sm accent" onclick="showToast('ブラウザで開きます')"><i class="ti ti-external-link" style="font-size:11px"></i> ブラウザで開く</button>
+          <button class="btn-sm accent" onclick="openUrl('${n.url}')"><i class="ti ti-external-link" style="font-size:11px"></i> ブラウザで開く</button>
           ${n.unread?`<button class="btn-sm" onclick="markRead(${n.id},this)">既読にする</button>`:''}
         </div>
       </div>`;
@@ -607,7 +703,10 @@ function renderFavorites(){
       <div class="fav-cover"><span>${f.emoji}</span><div class="fav-cover-bar"><div class="fav-progress" style="width:${f.progress}%"></div></div></div>
       <div class="fav-title">${f.title}</div>
       <div class="fav-sub">${siteTag(f.site)}<span>第${f.chapters}話</span></div>`;
-    d.onclick=()=>showToast(`「${f.title}」をブラウザで開きます`);
+    d.onclick=()=>{
+      if(f.url) openUrl(f.url);
+      else showToast(`「${f.title}」をブラウザで開きます`);
+    };
     g.appendChild(d);
   });
 }
@@ -655,14 +754,14 @@ function renderUrls(){
     d.innerHTML=`<div class="rss-icon" style="color:var(--acc)"><i class="ti ti-link" aria-hidden="true"></i></div>
       <div class="rss-body"><div class="rss-title">${u.title}</div><div class="rss-meta">${siteTag(u.site)} ${u.url.substring(0,36)}… · 通知: ${u.notify}</div></div>
       <div style="display:flex;gap:5px;">
-        <button class="btn-icon" onclick="showToast('ブラウザで開きます')"><i class="ti ti-external-link" aria-hidden="true"></i></button>
-        <button class="btn-icon" style="color:#E24B4A" onclick="this.closest('.rss-card').remove();showToast('削除しました')"><i class="ti ti-trash" aria-hidden="true"></i></button>
+        <button class="btn-icon" onclick="openUrl('${u.url}')"><i class="ti ti-external-link" aria-hidden="true"></i></button>
+        <button class="btn-icon" style="color:#E24B4A" onclick="removeUrl(${u.id})"><i class="ti ti-trash" aria-hidden="true"></i></button>
       </div>`;
     list.appendChild(d);
   });
 }
 
-const panelTitles={notif:'更新通知',fav:'お気に入り',reading:'読了位置',rss:'RSS監視',urls:'URL登録',ranking:'ランキング',search:'作品を探す',browse:'サイトを開く'};
+const panelTitles={notif:'更新通知',fav:'お気に入り',reading:'読了位置',rss:'RSS監視',urls:'URL登録',ranking:'ランキング',search:'作品を探す',browse:'サイトを開く',settings:'設定'};
 
 function switchNav(el,panel){
   document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
@@ -672,15 +771,37 @@ function switchNav(el,panel){
   document.getElementById('topbar-title').textContent=panelTitles[panel];
 }
 
-function toggleChip(el){el.classList.toggle('on');}
+function toggleChip(el){
+  const site=el.dataset.site;
+  if(!site) return;
+  el.classList.toggle('on');
+  if(activeSiteFilters.has(site)) activeSiteFilters.delete(site);
+  else activeSiteFilters.add(site);
+  updateSiteControls();
+  renderRanking();
+  doSearch();
+}
 function openModal(){document.getElementById('modal').classList.add('open');}
 function closeModal(){document.getElementById('modal').classList.remove('open');}
 function addUrl(){
   const url=document.getElementById('url-input').value.trim();
+  const category=document.getElementById('url-category').value;
+  const notify=document.getElementById('url-notify').value;
   if(!url){showToast('URLを入力してください');return;}
+  const site=parseSiteFromUrl(url);
+  const title=`${getSiteDisplay(url)} の登録URL (${category})`;
+  urlList.unshift({id:Date.now(),url,title,site,added:new Date().toISOString().slice(0,10),notify});
+  renderUrls();
   closeModal();
   showToast('URLを登録しました');
   document.getElementById('url-input').value='';
+}
+
+function removeUrl(id){
+  const idx=urlList.findIndex(u=>u.id===id);
+  if(idx!==-1) urlList.splice(idx,1);
+  renderUrls();
+  showToast('登録URLを削除しました');
 }
 
 let toastTimer;
@@ -692,6 +813,8 @@ function showToast(msg){
   toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
 }
 
+loadSettings();
+updateSiteControls();
 renderNotifications();
 renderFavorites();
 renderReading();
