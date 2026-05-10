@@ -139,8 +139,8 @@ function getInitialNovels() {
     createNovel({
       title: "サンプル：辺境の読書家",
       site: "小説家になろう",
-      latest: "第18話",
-      position: "第15話",
+      latestChapter: 18,
+      readChapter: 15,
       memo: "週末に続きから読む",
       unread: true,
     }),
@@ -153,8 +153,10 @@ function createNovel(values) {
     title: values.title,
     site: values.site,
     url: values.url || "",
-    latest: values.latest || "",
-    position: values.position || "",
+    latestChapter: toChapterNumber(values.latestChapter ?? values.latest),
+    readChapter: toChapterNumber(values.readChapter ?? values.position),
+    latest: formatChapter(toChapterNumber(values.latestChapter ?? values.latest)),
+    position: formatChapter(toChapterNumber(values.readChapter ?? values.position)),
     memo: values.memo || "",
     unread: Boolean(values.unread),
     updatedAt: new Date().toISOString(),
@@ -198,8 +200,8 @@ function showForm(novel = null) {
   elements.novelTitle.value = novel?.title || "";
   elements.novelSite.value = novel?.site || "小説家になろう";
   elements.novelUrl.value = novel?.url || "";
-  elements.novelLatest.value = novel?.latest || "";
-  elements.novelPosition.value = novel?.position || "";
+  elements.novelLatest.value = novel?.latestChapter || "";
+  elements.novelPosition.value = novel?.readChapter || "";
   elements.novelMemo.value = novel?.memo || "";
   elements.novelTitle.focus();
 }
@@ -217,8 +219,8 @@ function saveNovelFromForm(event) {
     title: elements.novelTitle.value.trim(),
     site: elements.novelSite.value,
     url: elements.novelUrl.value.trim(),
-    latest: elements.novelLatest.value.trim(),
-    position: elements.novelPosition.value.trim(),
+    latestChapter: toChapterNumber(elements.novelLatest.value),
+    readChapter: toChapterNumber(elements.novelPosition.value),
     memo: elements.novelMemo.value.trim(),
   };
 
@@ -232,11 +234,18 @@ function saveNovelFromForm(event) {
   if (id) {
     state.novels = state.novels.map((novel) => {
       if (novel.id !== id) return novel;
-      const latestChanged = novel.latest !== formValue.latest;
-      return { ...novel, ...formValue, unread: novel.unread || latestChanged, updatedAt: new Date().toISOString() };
+      const unread = formValue.latestChapter > formValue.readChapter;
+      return {
+        ...novel,
+        ...formValue,
+        latest: formatChapter(formValue.latestChapter),
+        position: formatChapter(formValue.readChapter),
+        unread,
+        updatedAt: new Date().toISOString(),
+      };
     });
   } else {
-    state.novels.unshift(createNovel({ ...formValue, unread: true }));
+    state.novels.unshift(createNovel({ ...formValue, unread: formValue.latestChapter > formValue.readChapter }));
   }
 
   saveState();
@@ -264,17 +273,31 @@ function normalizeText(text) {
 }
 
 function sanitizeNovel(novel) {
+  const latestChapter = toChapterNumber(novel.latestChapter ?? novel.latest);
+  const readChapter = toChapterNumber(novel.readChapter ?? novel.position);
+
   return {
     id: novel.id || createId(),
     title: String(novel.title || "").trim(),
     site: novel.site || "その他",
     url: String(novel.url || "").trim(),
-    latest: String(novel.latest || "").trim(),
-    position: String(novel.position || "").trim(),
+    latestChapter,
+    readChapter,
+    latest: formatChapter(latestChapter),
+    position: formatChapter(readChapter),
     memo: String(novel.memo || "").trim(),
-    unread: Boolean(novel.unread),
+    unread: Boolean(novel.unread) || latestChapter > readChapter,
     updatedAt: novel.updatedAt || new Date().toISOString(),
   };
+}
+
+function toChapterNumber(value) {
+  const match = String(value || "").match(/\d+/);
+  return match ? Number(match[0]) : 0;
+}
+
+function formatChapter(chapter) {
+  return chapter > 0 ? `第${chapter}話` : "";
 }
 
 function dedupeNovels(novels) {
@@ -324,8 +347,10 @@ function renderUpdates() {
 
 function renderNovelCard(novel) {
   const urlButton = novel.url
-    ? `<a class="text-button" href="${escapeHtml(novel.url)}" target="_blank" rel="noopener">開く</a>`
+    ? `<a class="text-button" href="${escapeHtml(novel.url)}" target="_blank" rel="noopener">続きから読む</a>`
     : "";
+  const unreadCount = getUnreadChapterCount(novel);
+  const progressText = getProgressText(novel, unreadCount);
 
   return `
     <article class="novel-card" data-id="${novel.id}">
@@ -335,11 +360,12 @@ function renderNovelCard(novel) {
           <div class="meta-row">
             <span class="badge">${escapeHtml(novel.site)}</span>
             ${novel.unread ? '<span class="badge unread">更新あり</span>' : ""}
-            ${novel.latest ? `<span class="badge">最新 ${escapeHtml(novel.latest)}</span>` : ""}
+            ${novel.latestChapter ? `<span class="badge">更新 ${novel.latestChapter}話</span>` : ""}
+            ${novel.readChapter ? `<span class="badge">読了 ${novel.readChapter}話</span>` : ""}
           </div>
         </div>
       </div>
-      ${novel.position ? `<p class="muted">読了位置：${escapeHtml(novel.position)}</p>` : ""}
+      ${progressText ? `<p class="muted">${escapeHtml(progressText)}</p>` : ""}
       ${novel.memo ? `<p>${escapeHtml(novel.memo)}</p>` : ""}
       <div class="card-actions">
         ${urlButton}
@@ -350,6 +376,17 @@ function renderNovelCard(novel) {
       </div>
     </article>
   `;
+}
+
+function getUnreadChapterCount(novel) {
+  return Math.max(0, Number(novel.latestChapter || 0) - Number(novel.readChapter || 0));
+}
+
+function getProgressText(novel, unreadCount) {
+  if (!novel.latestChapter && !novel.readChapter) return "";
+  if (unreadCount > 0) return `未読 ${unreadCount}話（${novel.readChapter}話 → ${novel.latestChapter}話）`;
+  if (novel.readChapter > 0) return `最新話まで読了済み（${novel.readChapter}話）`;
+  return `更新話数：${novel.latestChapter}話`;
 }
 
 function bindCardActions(container) {
@@ -365,13 +402,31 @@ function handleCardAction(button) {
 
   const action = button.dataset.action;
   if (action === "edit") showForm(novel);
-  if (action === "read") updateNovel(novel.id, { unread: false });
-  if (action === "update") updateNovel(novel.id, { unread: true, updatedAt: new Date().toISOString() });
+  if (action === "read") markNovelRead(novel);
+  if (action === "update") markNovelUpdated(novel);
   if (action === "delete" && confirm(`「${novel.title}」を削除しますか？`)) {
     state.novels = state.novels.filter((item) => item.id !== novel.id);
     saveState();
     render();
   }
+}
+
+function markNovelUpdated(novel) {
+  const latestChapter = Math.max(novel.latestChapter || 0, novel.readChapter || 0) + 1;
+  updateNovel(novel.id, {
+    latestChapter,
+    latest: formatChapter(latestChapter),
+    unread: true,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+function markNovelRead(novel) {
+  updateNovel(novel.id, {
+    readChapter: Math.max(novel.readChapter || 0, novel.latestChapter || 0),
+    position: formatChapter(Math.max(novel.readChapter || 0, novel.latestChapter || 0)),
+    unread: false,
+  });
 }
 
 function updateNovel(id, patch) {
@@ -381,7 +436,15 @@ function updateNovel(id, patch) {
 }
 
 function markAllRead() {
-  state.novels = state.novels.map((novel) => ({ ...novel, unread: false }));
+  state.novels = state.novels.map((novel) => {
+    const readChapter = Math.max(novel.readChapter || 0, novel.latestChapter || 0);
+    return {
+      ...novel,
+      readChapter,
+      position: formatChapter(readChapter),
+      unread: false,
+    };
+  });
   saveState();
   render();
 }
