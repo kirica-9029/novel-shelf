@@ -274,15 +274,25 @@ function getInitialNovels() {
 }
 
 function createNovel(values) {
-  const latestChapter = toChapterNumber(values.latestChapter ?? values.latest);
-  const readChapter = toChapterNumber(values.readChapter ?? values.position);
+  const latestChapter = toChapterNumber(values.generalAllNo ?? values.latestChapter ?? values.latest);
+  const readChapter = toChapterNumber(values.lastReadEpisode ?? values.readChapter ?? values.position);
+  const ncode = normalizeNcode(values.ncode) || extractNarouNcode(values.url);
+  const site = ncode ? DEFAULT_SITE : values.site;
+  const generalLastup = values.generalLastup || values.lastup || values.updatedAt || "";
+  const updatedAt = generalLastup ? toIsoDateOrNow(generalLastup) : values.updatedAt || new Date().toISOString();
 
   return {
     id: createId(),
     title: values.title,
-    site: values.site,
+    site,
+    ncode,
+    author: values.author || values.writer || "",
+    story: values.story || "",
     url: values.url || "",
-    ncode: normalizeNcode(values.ncode) || extractNarouNcode(values.url),
+    generalLastup,
+    generalAllNo: latestChapter,
+    lastReadEpisode: readChapter,
+    lastCheckedAt: values.lastCheckedAt || "",
     latestChapter,
     readChapter,
     latest: formatChapter(latestChapter),
@@ -292,8 +302,7 @@ function createNovel(values) {
     memo: values.memo || "",
     unread: Boolean(values.unread),
     lastCheckDiff: toChapterNumber(values.lastCheckDiff),
-    lastCheckedAt: values.lastCheckedAt || "",
-    updatedAt: values.updatedAt || new Date().toISOString(),
+    updatedAt,
   };
 }
 
@@ -353,8 +362,8 @@ function showForm(novel = null, options = {}) {
   elements.novelTitle.value = novel?.title || "";
   setSelectValue(elements.novelSite, novel?.site || DEFAULT_SITE);
   elements.novelUrl.value = novel?.url || "";
-  elements.novelLatest.value = novel?.latestChapter || "";
-  elements.novelPosition.value = novel?.readChapter || "";
+  elements.novelLatest.value = novel?.generalAllNo || novel?.latestChapter || "";
+  elements.novelPosition.value = novel?.lastReadEpisode || novel?.readChapter || "";
   elements.novelMemo.value = novel?.memo || "";
   elements.novelTitle.focus();
 }
@@ -387,13 +396,17 @@ function saveNovelFromForm(event) {
 function getNovelFormValue() {
   const url = elements.novelUrl.value.trim();
   const detectedSite = detectSiteFromUrl(url);
+  const latestChapter = toChapterNumber(elements.novelLatest.value);
+  const readChapter = toChapterNumber(elements.novelPosition.value);
   return {
     title: elements.novelTitle.value.trim(),
     site: detectedSite || elements.novelSite.value,
     url,
     ncode: extractNarouNcode(url),
-    latestChapter: toChapterNumber(elements.novelLatest.value),
-    readChapter: toChapterNumber(elements.novelPosition.value),
+    generalAllNo: latestChapter,
+    latestChapter,
+    lastReadEpisode: readChapter,
+    readChapter,
     memo: elements.novelMemo.value.trim(),
   };
 }
@@ -409,6 +422,8 @@ function upsertNovel(formValue, id) {
     return {
       ...novel,
       ...formValue,
+      generalAllNo: formValue.generalAllNo,
+      lastReadEpisode: formValue.lastReadEpisode,
       latest: formatChapter(formValue.latestChapter),
       position: formatChapter(formValue.readChapter),
       unread: hasUnreadChapters(formValue),
@@ -419,7 +434,7 @@ function upsertNovel(formValue, id) {
 }
 
 function hasUnreadChapters(novel) {
-  return novel.latestChapter > novel.readChapter;
+  return toChapterNumber(novel.generalAllNo ?? novel.latestChapter) > toChapterNumber(novel.lastReadEpisode ?? novel.readChapter);
 }
 
 function findDuplicateNovel(target, ignoreId = "") {
@@ -460,15 +475,24 @@ function normalizeText(text) {
 
 function sanitizeNovel(novel) {
   // Older exports used Japanese strings like "第12話"; normalize both shapes.
-  const latestChapter = toChapterNumber(novel.latestChapter ?? novel.latest);
-  const readChapter = toChapterNumber(novel.readChapter ?? novel.position);
+  const latestChapter = toChapterNumber(novel.generalAllNo ?? novel.latestChapter ?? novel.latest);
+  const readChapter = toChapterNumber(novel.lastReadEpisode ?? novel.readChapter ?? novel.position);
+  const ncode = normalizeNcode(novel.ncode) || extractNarouNcode(novel.url);
+  const generalLastup = novel.generalLastup || novel.lastup || novel.updatedAt || "";
+  const site = ncode ? DEFAULT_SITE : novel.site || OTHER_SITE;
 
   return {
     id: novel.id || createId(),
     title: String(novel.title || "").trim(),
-    site: novel.site || OTHER_SITE,
+    site,
+    ncode,
+    author: String(novel.author || novel.writer || "").trim(),
+    story: String(novel.story || "").trim(),
     url: String(novel.url || "").trim(),
-    ncode: normalizeNcode(novel.ncode) || extractNarouNcode(novel.url),
+    generalLastup,
+    generalAllNo: latestChapter,
+    lastReadEpisode: readChapter,
+    lastCheckedAt: novel.lastCheckedAt || "",
     latestChapter,
     readChapter,
     latest: formatChapter(latestChapter),
@@ -478,8 +502,7 @@ function sanitizeNovel(novel) {
     memo: String(novel.memo || "").trim(),
     unread: Boolean(novel.unread) || hasUnreadChapters({ latestChapter, readChapter }),
     lastCheckDiff: toChapterNumber(novel.lastCheckDiff),
-    lastCheckedAt: novel.lastCheckedAt || "",
-    updatedAt: novel.updatedAt || new Date().toISOString(),
+    updatedAt: generalLastup ? toIsoDateOrNow(generalLastup) : novel.updatedAt || new Date().toISOString(),
   };
 }
 
@@ -688,16 +711,21 @@ function normalizeNarouNovel(item) {
   if (!item?.ncode || !item?.title) return null;
   const ncode = normalizeNcode(item.ncode);
   if (!ncode) return null;
+  const generalAllNo = toChapterNumber(item.general_all_no);
+  const generalLastup = item.general_lastup || "";
   return {
     id: `narou-${ncode}`,
     ncode,
     title: item.title,
+    author: item.writer || "作者不明",
     writer: item.writer || "作者不明",
     site: DEFAULT_SITE,
     url: `https://ncode.syosetu.com/${ncode.toLowerCase()}/`,
-    latestChapter: toChapterNumber(item.general_all_no),
+    generalLastup,
+    generalAllNo,
+    latestChapter: generalAllNo,
     story: item.story || "",
-    lastup: item.general_lastup || "",
+    lastup: generalLastup,
   };
 }
 
@@ -763,20 +791,26 @@ function addCatalogNovel(catalogId) {
   const item = state.catalogResults.find((catalogItem) => catalogItem.id === catalogId);
   if (!item || findDuplicateNovel(item)) return;
 
-  const novel = createNovel({
-    title: item.title,
-    site: item.site,
-    url: item.url,
-    ncode: item.ncode,
-    latestChapter: item.latestChapter,
-    readChapter: 0,
-    memo: `作者：${item.writer}\n${item.story}`,
-    unread: item.latestChapter > 0,
-    updatedAt: toIsoDateOrNow(item.lastup),
-  });
+  const novel = createNovelFromNarouItem(item);
   state.novels.unshift(novel);
   saveState();
   render();
+}
+
+function createNovelFromNarouItem(item) {
+  return createNovel({
+    title: item.title,
+    site: DEFAULT_SITE,
+    ncode: item.ncode,
+    author: item.author || item.writer,
+    story: item.story,
+    url: item.url,
+    generalLastup: item.generalLastup || item.lastup,
+    generalAllNo: item.generalAllNo ?? item.latestChapter,
+    lastReadEpisode: 0,
+    memo: `作者：${item.author || item.writer}\n${item.story}`,
+    unread: toChapterNumber(item.generalAllNo ?? item.latestChapter) > 0,
+  });
 }
 
 async function registerNovelFromUrl() {
@@ -818,21 +852,11 @@ function addNarouItemFromUrl(item) {
     return;
   }
 
-  const novel = createNovel({
-    title: item.title,
-    site: item.site,
-    url: item.url,
-    ncode: item.ncode,
-    latestChapter: item.latestChapter,
-    readChapter: 0,
-    memo: `作者：${item.writer}\n${item.story}`,
-    unread: item.latestChapter > 0,
-    updatedAt: toIsoDateOrNow(item.lastup),
-  });
+  const novel = createNovelFromNarouItem(item);
   state.novels.unshift(novel);
   elements.quickUrl.value = "";
-  showCatalogMessage("小説家になろうAPIから作品情報を取得して本棚に追加しました。");
   saveState();
+  showCatalogMessage("小説家になろうAPIから作品情報を取得して本棚に追加しました。");
   render();
 }
 
@@ -920,22 +944,32 @@ function isNarouNovelWithNcode(novel) {
   return Boolean(novel.ncode);
 }
 
+function isExternalManagedNovel(novel) {
+  return !isNarouNovelWithNcode(novel);
+}
+
 function createNarouUpdatePatch(novel, latestItem, checkedAt) {
-  const previousChapter = toChapterNumber(novel.latestChapter);
-  const latestChapter = toChapterNumber(latestItem.latestChapter);
-  const previousUpdatedAt = getTimestamp(novel.updatedAt);
-  const latestUpdatedIso = latestItem.lastup ? toIsoDateOrNow(latestItem.lastup) : novel.updatedAt;
+  const previousChapter = toChapterNumber(novel.generalAllNo ?? novel.latestChapter);
+  const latestChapter = toChapterNumber(latestItem.generalAllNo ?? latestItem.latestChapter);
+  const previousLastup = novel.generalLastup || novel.updatedAt || "";
+  const latestLastup = latestItem.generalLastup || latestItem.lastup || "";
+  const previousUpdatedAt = getTimestamp(toIsoDateOrNow(previousLastup));
+  const latestUpdatedIso = latestLastup ? toIsoDateOrNow(latestLastup) : novel.updatedAt;
   const latestUpdatedAt = getTimestamp(latestUpdatedIso);
   const chapterDiff = Math.max(0, latestChapter - previousChapter);
-  const hasUpdate = chapterDiff > 0 || latestUpdatedAt > previousUpdatedAt;
-  const unread = hasUpdate || latestChapter > toChapterNumber(novel.readChapter) || novel.unread;
+  const hasUpdate = chapterDiff > 0 || latestLastup !== previousLastup || latestUpdatedAt > previousUpdatedAt;
+  const unread = hasUpdate || latestChapter > toChapterNumber(novel.lastReadEpisode ?? novel.readChapter) || novel.unread;
 
   return {
     hasUpdate,
     title: latestItem.title || novel.title,
     site: DEFAULT_SITE,
+    author: latestItem.author || latestItem.writer || novel.author,
+    story: latestItem.story || novel.story,
     url: latestItem.url || novel.url,
     ncode: latestItem.ncode || novel.ncode,
+    generalLastup: latestLastup || previousLastup,
+    generalAllNo: latestChapter,
     latestChapter,
     latest: formatChapter(latestChapter),
     updatedAt: latestUpdatedIso,
@@ -985,12 +1019,12 @@ function renderUpdateCard(novel) {
           <span class="new-label">NEW</span>
           <div>
             <h3 class="novel-title">${escapeHtml(novel.title)}</h3>
-            <p class="update-time">最終更新：${escapeHtml(formatUpdatedAt(novel.updatedAt))}</p>
+            <p class="update-time">最終更新：${escapeHtml(formatUpdatedAt(novel.generalLastup || novel.updatedAt))}</p>
           </div>
         </div>
         <div class="meta-row">
           <span class="badge">${escapeHtml(novel.site)}</span>
-          ${novel.latestChapter ? `<span class="badge">更新 ${novel.latestChapter}話</span>` : ""}
+          ${novel.generalAllNo ? `<span class="badge">更新 ${novel.generalAllNo}話</span>` : ""}
           ${unreadCount ? `<span class="badge unread">未読 ${unreadCount}話</span>` : ""}
           ${checkDiffText ? `<span class="badge unread">${escapeHtml(checkDiffText)}</span>` : ""}
           <span class="badge">次 ${nextChapter}話</span>
@@ -1008,9 +1042,11 @@ function renderUpdateCard(novel) {
 }
 
 function getUpdateDiffText(novel, unreadCount) {
-  if (!novel.latestChapter) return "更新話数は未設定です";
-  if (unreadCount > 0) return `${novel.readChapter}話から${novel.latestChapter}話まで、${unreadCount}話分の更新があります`;
-  return `${novel.latestChapter}話まで確認済みです`;
+  const latestEpisode = toChapterNumber(novel.generalAllNo ?? novel.latestChapter);
+  const lastReadEpisode = toChapterNumber(novel.lastReadEpisode ?? novel.readChapter);
+  if (!latestEpisode) return "更新話数は未設定です";
+  if (unreadCount > 0) return `${lastReadEpisode}話から${latestEpisode}話まで、${unreadCount}話分の更新があります`;
+  return `${latestEpisode}話まで確認済みです`;
 }
 
 function renderNovelCard(novel) {
@@ -1028,17 +1064,19 @@ function renderNovelCard(novel) {
           <h3 class="novel-title">${escapeHtml(novel.title)}</h3>
           <div class="meta-row">
             <span class="badge">${escapeHtml(novel.site)}</span>
+            ${isExternalManagedNovel(novel) ? '<span class="badge">外部リンク管理</span>' : ""}
             ${novel.unread ? '<span class="badge unread">更新あり</span>' : ""}
             ${novel.unread ? '<span class="new-label">NEW</span>' : ""}
-            ${novel.latestChapter ? `<span class="badge">更新 ${novel.latestChapter}話</span>` : ""}
+            ${novel.generalAllNo ? `<span class="badge">更新 ${novel.generalAllNo}話</span>` : ""}
             ${novel.lastCheckDiff ? `<span class="badge unread">差分 +${novel.lastCheckDiff}話</span>` : ""}
-            ${novel.readChapter ? `<span class="badge">読了 ${novel.readChapter}話</span>` : ""}
+            ${novel.lastReadEpisode ? `<span class="badge">読了 ${novel.lastReadEpisode}話</span>` : ""}
             ${novel.ncode ? `<span class="badge">${escapeHtml(novel.ncode)}</span>` : ""}
           </div>
         </div>
       </div>
       ${progressText ? `<p class="muted">${escapeHtml(progressText)}</p>` : ""}
       ${viewedText ? `<p class="muted">${escapeHtml(viewedText)}</p>` : ""}
+      ${novel.author ? `<p class="muted">作者：${escapeHtml(novel.author)}</p>` : ""}
       ${novel.memo ? `<p>${escapeHtml(novel.memo)}</p>` : ""}
       <div class="card-actions">
         ${urlButton}
@@ -1060,14 +1098,16 @@ function renderContinueLink(novel) {
 }
 
 function getUnreadChapterCount(novel) {
-  return Math.max(0, Number(novel.latestChapter || 0) - Number(novel.readChapter || 0));
+  return Math.max(0, Number(novel.generalAllNo ?? novel.latestChapter ?? 0) - Number(novel.lastReadEpisode ?? novel.readChapter ?? 0));
 }
 
 function getProgressText(novel, unreadCount) {
-  if (!novel.latestChapter && !novel.readChapter) return "";
-  if (unreadCount > 0) return `未読 ${unreadCount}話（${novel.readChapter}話 → ${novel.latestChapter}話）`;
-  if (novel.readChapter > 0) return `最新話まで読了済み（${novel.readChapter}話）`;
-  return `更新話数：${novel.latestChapter}話`;
+  const latestEpisode = toChapterNumber(novel.generalAllNo ?? novel.latestChapter);
+  const lastReadEpisode = toChapterNumber(novel.lastReadEpisode ?? novel.readChapter);
+  if (!latestEpisode && !lastReadEpisode) return isExternalManagedNovel(novel) ? "API未対応サイトのため、更新は外部リンクで確認します" : "";
+  if (unreadCount > 0) return `未読 ${unreadCount}話（${lastReadEpisode}話 → ${latestEpisode}話）`;
+  if (lastReadEpisode > 0) return `最新話まで読了済み（${lastReadEpisode}話）`;
+  return `更新話数：${latestEpisode}話`;
 }
 
 function getViewedText(novel) {
@@ -1125,19 +1165,20 @@ function deleteNovel(novel) {
 
 function saveReadingProgress(novel) {
   const openedChapter = getNextReadableChapter(novel);
-  const readChapter = Math.max(novel.readChapter || 0, openedChapter);
+  const readChapter = Math.max(novel.lastReadEpisode || novel.readChapter || 0, openedChapter);
   const now = new Date().toISOString();
 
   state.novels = state.novels.map((item) => {
     if (item.id !== novel.id) return item;
     return {
       ...item,
+      lastReadEpisode: readChapter,
       readChapter,
       position: formatChapter(readChapter),
       lastOpenedChapter: openedChapter,
       lastViewedAt: now,
-      unread: item.latestChapter > readChapter,
-      lastCheckDiff: item.latestChapter > readChapter ? item.lastCheckDiff : 0,
+      unread: (item.generalAllNo || item.latestChapter) > readChapter,
+      lastCheckDiff: (item.generalAllNo || item.latestChapter) > readChapter ? item.lastCheckDiff : 0,
     };
   });
   saveState();
@@ -1145,8 +1186,8 @@ function saveReadingProgress(novel) {
 }
 
 function getNextReadableChapter(novel) {
-  const latestChapter = novel.latestChapter || 0;
-  const readChapter = novel.readChapter || 0;
+  const latestChapter = novel.generalAllNo || novel.latestChapter || 0;
+  const readChapter = novel.lastReadEpisode || novel.readChapter || 0;
   if (!latestChapter) return readChapter || 1;
   return Math.min(latestChapter, readChapter + 1 || 1);
 }
@@ -1161,6 +1202,7 @@ function getContinueUrl(novel, chapter) {
 function markNovelRead(novel) {
   const readChapter = getReadableLatestChapter(novel);
   updateNovel(novel.id, {
+    lastReadEpisode: readChapter,
     readChapter,
     position: formatChapter(readChapter),
     unread: false,
@@ -1169,7 +1211,7 @@ function markNovelRead(novel) {
 }
 
 function getReadableLatestChapter(novel) {
-  return Math.max(novel.readChapter || 0, novel.latestChapter || 0);
+  return Math.max(novel.lastReadEpisode || novel.readChapter || 0, novel.generalAllNo || novel.latestChapter || 0);
 }
 
 function updateNovel(id, patch) {
@@ -1183,6 +1225,7 @@ function markAllRead() {
     const readChapter = getReadableLatestChapter(novel);
     return {
       ...novel,
+      lastReadEpisode: readChapter,
       readChapter,
       position: formatChapter(readChapter),
       unread: false,
@@ -1230,6 +1273,7 @@ function renderRankingItem(novel, index) {
   const unreadCount = getUnreadChapterCount(novel);
   const nextChapter = getNextReadableChapter(novel);
   const continueButton = novel.url ? renderContinueLink(novel) : "";
+  const latestEpisode = novel.generalAllNo || novel.latestChapter || 0;
 
   return `
     <article class="ranking-item" data-id="${novel.id}">
@@ -1244,12 +1288,12 @@ function renderRankingItem(novel, index) {
         </div>
         <div class="meta-row">
           <span class="badge">${escapeHtml(novel.site)}</span>
-          <span class="badge">更新 ${novel.latestChapter || 0}話</span>
+          <span class="badge">更新 ${latestEpisode}話</span>
           <span class="badge unread">差分 ${unreadCount}話</span>
           <span class="badge">次 ${nextChapter}話</span>
         </div>
         <p class="update-diff">${escapeHtml(getUpdateDiffText(novel, unreadCount))}</p>
-        <p class="update-time">最終更新：${escapeHtml(formatUpdatedAt(novel.updatedAt))}</p>
+        <p class="update-time">最終更新：${escapeHtml(formatUpdatedAt(novel.generalLastup || novel.updatedAt))}</p>
         ${novel.lastViewedAt ? `<p class="update-time">最終巡回：${escapeHtml(formatUpdatedAt(novel.lastViewedAt))}</p>` : ""}
         <div class="card-actions update-actions">
           ${continueButton}
