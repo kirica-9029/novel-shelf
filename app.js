@@ -262,8 +262,16 @@ function bindSettingsEvents() {
   elements.exportData.addEventListener("click", exportData);
   elements.importData.addEventListener("change", importData);
   elements.clearData.addEventListener("click", clearData);
-  elements.tutorialClose.addEventListener("click", completeTutorial);
-  elements.tutorialComplete.addEventListener("click", completeTutorial);
+  elements.tutorialClose?.addEventListener("click", completeTutorial);
+  elements.tutorialComplete?.addEventListener("click", completeTutorial);
+  elements.tutorialModal?.addEventListener("click", (event) => {
+    if (event.target === elements.tutorialModal) completeTutorial();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !elements.tutorialModal?.classList.contains("is-hidden")) {
+      completeTutorial();
+    }
+  });
 }
 
 function bindRankingControl(element, stateKey, eventName, options = {}) {

@@ -865,6 +865,10 @@ textarea {
   background: rgba(10, 12, 10, 0.58);
 }
 
+.tutorial-modal.is-hidden {
+  display: none;
+}
+
 .tutorial-card {
   width: min(100%, 520px);
   padding: 18px;
