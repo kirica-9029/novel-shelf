@@ -3,8 +3,8 @@
   --surface: #ffffff;
   --surface-soft: #ededE8;
   --text: #1d1d1b;
-  --muted: #6c6c64;
-  --line: #d8d8cf;
+  --muted: #56564e;
+  --line: #c9c9bf;
   --accent: #2f6f5e;
   --accent-strong: #215344;
   --danger: #b24136;
@@ -16,8 +16,8 @@
   --surface: #1a1c19;
   --surface-soft: #252821;
   --text: #f0f0ea;
-  --muted: #aaa99f;
-  --line: #373a33;
+  --muted: #c7c6ba;
+  --line: #4b4f45;
   --accent: #7ac7ad;
   --accent-strong: #9bdcc7;
   --danger: #e07d73;
@@ -46,6 +46,15 @@ textarea {
 
 button {
   cursor: pointer;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--accent-strong);
+  outline-offset: 3px;
 }
 
 .app-header {

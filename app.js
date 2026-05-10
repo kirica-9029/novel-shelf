@@ -154,7 +154,7 @@ function populateStaticOptions() {
 function populateCatalogSiteTabs() {
   elements.catalogSiteTabs.innerHTML = SEARCH_SITE_OPTIONS.map((site) => `
     <li>
-      <button class="site-card${site === state.catalogSite ? " is-active" : ""}" type="button" data-catalog-site="${escapeHtml(site)}">
+      <button class="site-card${site === state.catalogSite ? " is-active" : ""}" type="button" data-catalog-site="${escapeHtml(site)}" aria-label="${escapeHtml(`${site}で作品を探す`)}">
         <span class="site-card-icon" aria-hidden="true">${escapeHtml(getSiteCardMeta(site).icon)}</span>
         <span class="site-card-body">
           <span class="site-card-name">${escapeHtml(site)}</span>
@@ -1075,6 +1075,7 @@ function getCatalogErrorMessage(error) {
 
 function renderCatalogCard(item) {
   const alreadyAdded = Boolean(findDuplicateNovel(item));
+  const addButtonLabel = alreadyAdded ? `${item.title}は登録済みです` : `${item.title}を本棚に追加`;
   const chips = getNarouMetaChips(item).map((chip) => `<span class="tag-chip">${escapeHtml(chip)}</span>`).join("");
   const storyId = `story-${escapeHtml(item.id)}`;
 
@@ -1087,15 +1088,15 @@ function renderCatalogCard(item) {
         <div class="meta-row">
           <span class="badge">話数 ${item.latestChapter || 0}</span>
           <span class="badge">最終更新 ${escapeHtml(item.lastup || "不明")}</span>
-          <a class="text-button" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">作品URL</a>
+          <a class="text-button" href="${escapeHtml(item.url)}" target="_blank" rel="noopener" aria-label="${escapeHtml(`${item.title}を公式サイトで開く`)}">作品URL</a>
         </div>
         ${chips ? `<div class="tag-row">${chips}</div>` : ""}
         <p class="catalog-story" id="${storyId}">${escapeHtml(item.story || "あらすじはありません。")}</p>
-        <button class="text-button story-toggle" type="button" data-story-toggle="${item.id}" aria-expanded="false" aria-controls="${storyId}">
+        <button class="text-button story-toggle" type="button" data-story-toggle="${item.id}" aria-expanded="false" aria-controls="${storyId}" aria-label="${escapeHtml(`${item.title}のあらすじを開く`)}">
           あらすじを開く
         </button>
       </div>
-      <button class="primary-button catalog-add-button" type="button" data-catalog-id="${item.id}" ${alreadyAdded ? "disabled" : ""}>
+      <button class="primary-button catalog-add-button" type="button" data-catalog-id="${item.id}" aria-label="${escapeHtml(addButtonLabel)}" ${alreadyAdded ? "disabled" : ""}>
         ${alreadyAdded ? "登録済み" : "本棚に追加"}
       </button>
     </article>
@@ -1124,6 +1125,7 @@ function toggleCatalogStory(button) {
   const card = button.closest(".catalog-card");
   const expanded = button.getAttribute("aria-expanded") === "true";
   button.setAttribute("aria-expanded", String(!expanded));
+  button.setAttribute("aria-label", expanded ? "あらすじを開く" : "あらすじを閉じる");
   card.classList.toggle("is-story-open", !expanded);
   button.textContent = expanded ? "あらすじを開く" : "あらすじを閉じる";
 }
@@ -1383,8 +1385,8 @@ function renderUpdateCard(novel) {
       </div>
       <div class="card-actions update-actions">
         ${continueButton}
-        <button class="text-button" type="button" data-action="read">既読</button>
-        <button class="text-button" type="button" data-action="edit">編集</button>
+        <button class="text-button" type="button" data-action="read" aria-label="${escapeHtml(`${novel.title}を既読にする`)}">既読</button>
+        <button class="text-button" type="button" data-action="edit" aria-label="${escapeHtml(`${novel.title}を編集する`)}">編集</button>
       </div>
     </article>
   `;
@@ -1432,10 +1434,10 @@ function renderNovelCard(novel) {
       ${novel.memo ? `<p>${escapeHtml(novel.memo)}</p>` : ""}
       <div class="card-actions">
         ${urlButton}
-        ${novel.ncode ? '<button class="text-button" type="button" data-action="reader">話一覧</button>' : ""}
-        <button class="text-button" type="button" data-action="read">既読</button>
-        <button class="text-button" type="button" data-action="edit">編集</button>
-        <button class="text-button" type="button" data-action="delete">削除</button>
+        ${novel.ncode ? `<button class="text-button" type="button" data-action="reader" aria-label="${escapeHtml(`${novel.title}の話一覧を開く`)}">話一覧</button>` : ""}
+        <button class="text-button" type="button" data-action="read" aria-label="${escapeHtml(`${novel.title}を既読にする`)}">既読</button>
+        <button class="text-button" type="button" data-action="edit" aria-label="${escapeHtml(`${novel.title}を編集する`)}">編集</button>
+        <button class="text-button" type="button" data-action="delete" aria-label="${escapeHtml(`${novel.title}を削除する`)}">削除</button>
       </div>
     </article>
   `;
@@ -1444,7 +1446,7 @@ function renderNovelCard(novel) {
 function renderContinueLink(novel) {
   const chapter = getNextReadableChapter(novel);
   return `
-    <a class="text-button" href="${escapeHtml(getContinueUrl(novel, chapter))}" target="_blank" rel="noopener">
+    <a class="text-button" href="${escapeHtml(getContinueUrl(novel, chapter))}" target="_blank" rel="noopener" aria-label="${escapeHtml(`${novel.title}の${chapter}話を公式サイトで開く`)}">
       続きから読む
     </a>
   `;
@@ -1480,7 +1482,7 @@ function renderReader() {
 function renderReaderEmpty() {
   return `
     <div class="reader-header">
-      <button class="ghost-button" type="button" data-reader-action="back">本棚へ戻る</button>
+      <button class="ghost-button" type="button" data-reader-action="back" aria-label="本棚へ戻る">本棚へ戻る</button>
     </div>
     <div class="empty-state">本棚から作品を選択してください。</div>
   `;
@@ -1489,12 +1491,12 @@ function renderReaderEmpty() {
 function renderExternalReaderNotice(novel) {
   return `
     <div class="reader-header">
-      <button class="ghost-button" type="button" data-reader-action="back">本棚へ戻る</button>
+      <button class="ghost-button" type="button" data-reader-action="back" aria-label="本棚へ戻る">本棚へ戻る</button>
     </div>
     <article class="reader-summary">
       <h2>${escapeHtml(novel.title)}</h2>
       <p class="muted">この作品は外部リンク管理です。自動話一覧は小説家になろう作品のみ対応しています。</p>
-      ${novel.url ? `<a class="primary-button reader-official-link" href="${escapeHtml(novel.url)}" target="_blank" rel="noopener">公式サイトで開く</a>` : ""}
+      ${novel.url ? `<a class="primary-button reader-official-link" href="${escapeHtml(novel.url)}" target="_blank" rel="noopener" aria-label="${escapeHtml(`${novel.title}を公式サイトで開く`)}">公式サイトで開く</a>` : ""}
     </article>
   `;
 }
@@ -1502,8 +1504,8 @@ function renderExternalReaderNotice(novel) {
 function renderReaderPanel(model) {
   return `
     <div class="reader-header">
-      <button class="ghost-button" type="button" data-reader-action="back">本棚へ戻る</button>
-      <a class="text-button" href="${escapeHtml(model.url)}" target="_blank" rel="noopener">公式作品ページ</a>
+      <button class="ghost-button" type="button" data-reader-action="back" aria-label="本棚へ戻る">本棚へ戻る</button>
+      <a class="text-button" href="${escapeHtml(model.url)}" target="_blank" rel="noopener" aria-label="${escapeHtml(`${model.title}の公式作品ページを開く`)}">公式作品ページ</a>
     </div>
     <article class="reader-summary">
       <p class="ranking-source">${escapeHtml(model.site)}</p>
@@ -1529,7 +1531,7 @@ function renderReaderPanel(model) {
 
 function renderEpisodeItem(item) {
   return `
-    <a class="episode-link${item.read ? " is-read" : ""}" href="${escapeHtml(item.url)}" target="_blank" rel="noopener" data-reader-episode="${item.episode}">
+    <a class="episode-link${item.read ? " is-read" : ""}" href="${escapeHtml(item.url)}" target="_blank" rel="noopener" data-reader-episode="${item.episode}" aria-label="${escapeHtml(`${item.title}を公式サイトで開き、読了位置を更新する`)}">
       <span>${escapeHtml(item.title)}</span>
       <span>${item.read ? "読了" : "未読"}</span>
     </a>
@@ -1739,7 +1741,7 @@ function renderRankingItem(novel, index) {
         ${novel.lastViewedAt ? `<p class="update-time">最終巡回：${escapeHtml(formatUpdatedAt(novel.lastViewedAt))}</p>` : ""}
         <div class="card-actions update-actions">
           ${continueButton}
-          <button class="text-button" type="button" data-action="read">既読</button>
+          <button class="text-button" type="button" data-action="read" aria-label="${escapeHtml(`${novel.title}を既読にする`)}">既読</button>
         </div>
       </div>
     </article>
