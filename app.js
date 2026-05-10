@@ -16,39 +16,26 @@ const SITE_HOME_URLS = {
   ノクターン: "https://noc.syosetu.com/",
 };
 
-const periodLabels = {
-  daily: "日間",
-  weekly: "週間",
-  monthly: "月間",
-};
-
-const rankingSeed = [
-  { title: "薬草師は静かに暮らしたい", site: "小説家になろう", genre: "異世界", tags: ["スローライフ", "薬師"], scores: { daily: 9820, weekly: 42100, monthly: 162400 } },
-  { title: "辺境都市の図書館長", site: "小説家になろう", genre: "異世界", tags: ["内政", "読書"], scores: { daily: 7460, weekly: 39800, monthly: 155900 } },
-  { title: "夜勤明けの魔法使い", site: "カクヨム", genre: "現代", tags: ["現代ファンタジー", "社会人"], scores: { daily: 8640, weekly: 45200, monthly: 149500 } },
-  { title: "星間郵便局の配達記録", site: "カクヨム", genre: "SF", tags: ["宇宙", "仕事"], scores: { daily: 8120, weekly: 38600, monthly: 171200 } },
-  { title: "もしも英雄科に編入したら", site: "ハーメルン", genre: "二次創作", tags: ["学園", "バトル"], scores: { daily: 7900, weekly: 47100, monthly: 183000 } },
-  { title: "放課後の錬金ログ", site: "ハーメルン", genre: "二次創作", tags: ["錬金術", "日常"], scores: { daily: 6350, weekly: 35100, monthly: 128800 } },
-  { title: "古き掲示板の竜騎士", site: "Arcadia", genre: "異世界", tags: ["掲示板", "竜"], scores: { daily: 6740, weekly: 30500, monthly: 112200 } },
-  { title: "北方砦の傭兵録", site: "Arcadia", genre: "異世界", tags: ["戦記", "成り上がり"], scores: { daily: 5480, weekly: 33600, monthly: 121900 } },
-  { title: "暁に響く航宙譚", site: "暁", genre: "SF", tags: ["艦隊", "宇宙"], scores: { daily: 6410, weekly: 35900, monthly: 135700 } },
-  { title: "黎明の魔導士候補生", site: "暁", genre: "異世界", tags: ["魔法", "学園"], scores: { daily: 5220, weekly: 28800, monthly: 118300 } },
-  { title: "ノベラの街角食堂", site: "ノベルアップ+", genre: "現代", tags: ["料理", "群像劇"], scores: { daily: 6180, weekly: 31400, monthly: 109600 } },
-  { title: "竜と配信者の週末", site: "ノベルアップ+", genre: "現代", tags: ["配信", "コメディ"], scores: { daily: 5900, weekly: 32900, monthly: 101500 } },
-  { title: "放課後イラストノベル", site: "pixiv小説", genre: "現代", tags: ["青春", "創作"], scores: { daily: 5870, weekly: 27600, monthly: 96500 } },
-  { title: "春待ちアトリエ", site: "pixiv小説", genre: "現代", tags: ["恋愛", "青春"], scores: { daily: 5030, weekly: 30100, monthly: 104900 } },
-  { title: "夜想の迷宮記録", site: "ノクターン", genre: "異世界", tags: ["迷宮", "ダーク"], scores: { daily: 5520, weekly: 34200, monthly: 132100 } },
-  { title: "月下の契約者", site: "ノクターン", genre: "異世界", tags: ["恋愛", "ファンタジー"], scores: { daily: 4980, weekly: 29700, monthly: 120400 } },
-];
-
-const catalogSeed = rankingSeed.map((item, index) => ({
-  id: `catalog-${index + 1}`,
-  title: item.title,
-  site: item.site,
+const catalogSeed = [
+  { id: "catalog-1", title: "薬草師は静かに暮らしたい", site: "小説家になろう", latestChapter: 12, tags: ["スローライフ", "薬師"], summary: "異世界ジャンルの注目作品。スローライフ、薬師が好きな読者向けです。" },
+  { id: "catalog-2", title: "辺境都市の図書館長", site: "小説家になろう", latestChapter: 13, tags: ["内政", "読書"], summary: "異世界ジャンルの注目作品。内政、読書が好きな読者向けです。" },
+  { id: "catalog-3", title: "夜勤明けの魔法使い", site: "カクヨム", latestChapter: 14, tags: ["現代ファンタジー", "社会人"], summary: "現代ジャンルの注目作品。現代ファンタジー、社会人が好きな読者向けです。" },
+  { id: "catalog-4", title: "星間郵便局の配達記録", site: "カクヨム", latestChapter: 15, tags: ["宇宙", "仕事"], summary: "SFジャンルの注目作品。宇宙、仕事が好きな読者向けです。" },
+  { id: "catalog-5", title: "もしも英雄科に編入したら", site: "ハーメルン", latestChapter: 16, tags: ["学園", "バトル"], summary: "二次創作ジャンルの注目作品。学園、バトルが好きな読者向けです。" },
+  { id: "catalog-6", title: "放課後の錬金ログ", site: "ハーメルン", latestChapter: 17, tags: ["錬金術", "日常"], summary: "二次創作ジャンルの注目作品。錬金術、日常が好きな読者向けです。" },
+  { id: "catalog-7", title: "古き掲示板の竜騎士", site: "Arcadia", latestChapter: 18, tags: ["掲示板", "竜"], summary: "異世界ジャンルの注目作品。掲示板、竜が好きな読者向けです。" },
+  { id: "catalog-8", title: "北方砦の傭兵録", site: "Arcadia", latestChapter: 19, tags: ["戦記", "成り上がり"], summary: "異世界ジャンルの注目作品。戦記、成り上がりが好きな読者向けです。" },
+  { id: "catalog-9", title: "暁に響く航宙譚", site: "暁", latestChapter: 20, tags: ["艦隊", "宇宙"], summary: "SFジャンルの注目作品。艦隊、宇宙が好きな読者向けです。" },
+  { id: "catalog-10", title: "黎明の魔導士候補生", site: "暁", latestChapter: 21, tags: ["魔法", "学園"], summary: "異世界ジャンルの注目作品。魔法、学園が好きな読者向けです。" },
+  { id: "catalog-11", title: "ノベラの街角食堂", site: "ノベルアップ+", latestChapter: 22, tags: ["料理", "群像劇"], summary: "現代ジャンルの注目作品。料理、群像劇が好きな読者向けです。" },
+  { id: "catalog-12", title: "竜と配信者の週末", site: "ノベルアップ+", latestChapter: 23, tags: ["配信", "コメディ"], summary: "現代ジャンルの注目作品。配信、コメディが好きな読者向けです。" },
+  { id: "catalog-13", title: "放課後イラストノベル", site: "pixiv小説", latestChapter: 24, tags: ["青春", "創作"], summary: "現代ジャンルの注目作品。青春、創作が好きな読者向けです。" },
+  { id: "catalog-14", title: "春待ちアトリエ", site: "pixiv小説", latestChapter: 25, tags: ["恋愛", "青春"], summary: "現代ジャンルの注目作品。恋愛、青春が好きな読者向けです。" },
+  { id: "catalog-15", title: "夜想の迷宮記録", site: "ノクターン", latestChapter: 26, tags: ["迷宮", "ダーク"], summary: "異世界ジャンルの注目作品。迷宮、ダークが好きな読者向けです。" },
+  { id: "catalog-16", title: "月下の契約者", site: "ノクターン", latestChapter: 27, tags: ["恋愛", "ファンタジー"], summary: "異世界ジャンルの注目作品。恋愛、ファンタジーが好きな読者向けです。" },
+].map((item) => ({
+  ...item,
   url: SITE_HOME_URLS[item.site] || "",
-  latestChapter: 12 + index,
-  tags: item.tags,
-  summary: `${item.genre}ジャンルの注目作品。${item.tags.join("、")}が好きな読者向けです。`,
 }));
 
 const state = {
@@ -58,11 +45,8 @@ const state = {
   catalogSearch: "",
   librarySearch: "",
   siteFilter: "all",
-  rankingPeriod: "daily",
   rankingSite: "all",
-  rankingGenre: "all",
-  rankingSort: "score",
-  rankingTag: "",
+  rankingSort: "updated",
   rankingSearch: "",
 };
 
@@ -108,11 +92,8 @@ function cacheElements() {
     updatesSummary: document.querySelector("#updatesSummary"),
     markAllRead: document.querySelector("#markAllRead"),
     rankingControls: document.querySelector("#rankingControls"),
-    rankingPeriodButtons: document.querySelectorAll("[data-ranking-period]"),
     rankingSite: document.querySelector("#rankingSite"),
-    rankingGenre: document.querySelector("#rankingGenre"),
     rankingSort: document.querySelector("#rankingSort"),
-    rankingTag: document.querySelector("#rankingTag"),
     rankingSearch: document.querySelector("#rankingSearch"),
     rankingList: document.querySelector("#rankingList"),
     rankingEmpty: document.querySelector("#rankingEmpty"),
@@ -199,16 +180,8 @@ function bindRankingEvents() {
   elements.rankingControls.addEventListener("submit", (event) => {
     event.preventDefault();
   });
-  elements.rankingPeriodButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      state.rankingPeriod = button.dataset.rankingPeriod;
-      renderRanking();
-    });
-  });
   bindRankingControl(elements.rankingSite, "rankingSite", "change");
-  bindRankingControl(elements.rankingGenre, "rankingGenre", "change");
   bindRankingControl(elements.rankingSort, "rankingSort", "change");
-  bindRankingControl(elements.rankingTag, "rankingTag", "input", { trim: true });
   bindRankingControl(elements.rankingSearch, "rankingSearch", "input", { trim: true });
 }
 
@@ -256,16 +229,7 @@ function parseImportedNovels(importedData) {
 }
 
 function getInitialNovels() {
-  return [
-    createNovel({
-      title: "サンプル：辺境の読書家",
-      site: DEFAULT_SITE,
-      latestChapter: 18,
-      readChapter: 15,
-      memo: "週末に続きから読む",
-      unread: true,
-    }),
-  ];
+  return [];
 }
 
 function createNovel(values) {
@@ -833,59 +797,66 @@ function markAllRead() {
 }
 
 function renderRanking() {
+  const hasSourceData = hasRankingSourceData();
   const items = getRankingItems();
-  elements.rankingPeriodButtons.forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.rankingPeriod === state.rankingPeriod);
-  });
+  elements.rankingControls.classList.toggle("is-hidden", !hasSourceData);
   elements.rankingEmpty.classList.toggle("is-hidden", items.length > 0);
   elements.rankingList.innerHTML = items.map(renderRankingItem).join("");
+  bindCardActions(elements.rankingList);
+}
+
+function hasRankingSourceData() {
+  return state.novels.some((novel) => getUnreadChapterCount(novel) > 0 || novel.unread);
 }
 
 function getRankingItems() {
   const keyword = normalizeText(state.rankingSearch);
-  const tagKeyword = normalizeText(state.rankingTag);
 
-  return rankingSeed
-    .filter((item) => {
-      const searchableText = normalizeText(`${item.title} ${item.site} ${item.genre} ${item.tags.join(" ")}`);
-      const tagText = normalizeText(item.tags.join(" "));
-      const matchesSite = state.rankingSite === "all" || item.site === state.rankingSite;
-      const matchesGenre = state.rankingGenre === "all" || item.genre === state.rankingGenre;
+  return state.novels
+    .filter((novel) => getUnreadChapterCount(novel) > 0 || novel.unread)
+    .filter((novel) => {
+      const searchableText = normalizeText(`${novel.title} ${novel.site} ${novel.memo}`);
+      const matchesSite = state.rankingSite === "all" || novel.site === state.rankingSite;
       const matchesKeyword = !keyword || searchableText.includes(keyword);
-      const matchesTag = !tagKeyword || tagText.includes(tagKeyword);
-      return matchesSite && matchesGenre && matchesKeyword && matchesTag;
+      return matchesSite && matchesKeyword;
     })
     .sort(sortRankingItems);
 }
 
 function sortRankingItems(a, b) {
-  if (state.rankingSort === "title") return a.title.localeCompare(b.title, "ja");
-  if (state.rankingSort === "site") return a.site.localeCompare(b.site, "ja") || getRankingScore(b) - getRankingScore(a);
-  return getRankingScore(b) - getRankingScore(a);
+  if (state.rankingSort === "unread") return getUnreadChapterCount(b) - getUnreadChapterCount(a) || compareByUpdateDate(a, b);
+  if (state.rankingSort === "stale") return getTimestamp(a.lastViewedAt) - getTimestamp(b.lastViewedAt) || compareByUpdateDate(a, b);
+  return compareByUpdateDate(a, b);
 }
 
-function getRankingScore(item) {
-  return item.scores[state.rankingPeriod] || 0;
-}
-
-function renderRankingItem(item, index) {
-  const score = getRankingScore(item);
-  const tags = item.tags.map((tag) => `<span class="tag-chip">#${escapeHtml(tag)}</span>`).join("");
+function renderRankingItem(novel, index) {
+  const unreadCount = getUnreadChapterCount(novel);
+  const nextChapter = getNextReadableChapter(novel);
+  const continueButton = novel.url ? renderContinueLink(novel) : "";
 
   return `
-    <article class="ranking-item">
+    <article class="ranking-item" data-id="${novel.id}">
       <div class="ranking-rank" aria-label="${index + 1}位">${index + 1}</div>
       <div class="ranking-body">
         <div class="card-top">
           <div>
-            <p class="ranking-source">${escapeHtml(item.site)} ${periodLabels[state.rankingPeriod]}ランキング</p>
-            <h3 class="novel-title">${escapeHtml(item.title)}</h3>
+            <p class="ranking-source">本棚データからリアルタイム更新</p>
+            <h3 class="novel-title">${escapeHtml(novel.title)}</h3>
           </div>
-          <span class="badge">${score.toLocaleString()} pt</span>
+          <span class="new-label">NEW</span>
         </div>
         <div class="meta-row">
-          <span class="badge">${escapeHtml(item.genre)}</span>
-          ${tags}
+          <span class="badge">${escapeHtml(novel.site)}</span>
+          <span class="badge">更新 ${novel.latestChapter || 0}話</span>
+          <span class="badge unread">差分 ${unreadCount}話</span>
+          <span class="badge">次 ${nextChapter}話</span>
+        </div>
+        <p class="update-diff">${escapeHtml(getUpdateDiffText(novel, unreadCount))}</p>
+        <p class="update-time">最終更新：${escapeHtml(formatUpdatedAt(novel.updatedAt))}</p>
+        ${novel.lastViewedAt ? `<p class="update-time">最終巡回：${escapeHtml(formatUpdatedAt(novel.lastViewedAt))}</p>` : ""}
+        <div class="card-actions update-actions">
+          ${continueButton}
+          <button class="text-button" type="button" data-action="read">既読</button>
         </div>
       </div>
     </article>

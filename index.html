@@ -131,57 +131,35 @@
       <section class="view" id="rankingView" data-view-panel="ranking">
         <div class="section-head">
           <div>
-            <h2>Web小説ランキング検索</h2>
-            <p>各サイトのランキングを日間・週間・月間で絞り込めます。</p>
+            <h2>更新優先リスト</h2>
+            <p>本棚の更新作品をリアルタイムに並べ替えて巡回できます。</p>
           </div>
         </div>
-        <form class="ranking-controls" id="rankingControls" role="search" aria-label="ランキング検索条件">
-          <fieldset class="period-control">
-            <legend>期間</legend>
-            <div class="segmented-control" aria-label="ランキング期間">
-              <button class="segment-button is-active" type="button" data-ranking-period="daily">日間</button>
-              <button class="segment-button" type="button" data-ranking-period="weekly">週間</button>
-              <button class="segment-button" type="button" data-ranking-period="monthly">月間</button>
-            </div>
-          </fieldset>
 
+        <form class="ranking-controls" id="rankingControls" role="search" aria-label="更新作品の絞り込み">
           <div class="ranking-filter-grid">
             <label>
               サイト
-              <select id="rankingSite" aria-label="ランキングサイト"></select>
-            </label>
-            <label>
-              ジャンル
-              <select id="rankingGenre" aria-label="ジャンル">
-                <option value="all">全ジャンル</option>
-                <option value="異世界">異世界</option>
-                <option value="現代">現代</option>
-                <option value="SF">SF</option>
-                <option value="二次創作">二次創作</option>
-              </select>
+              <select id="rankingSite" aria-label="サイト"></select>
             </label>
             <label>
               ソート
               <select id="rankingSort" aria-label="ソート">
-                <option value="score">ポイント順</option>
-                <option value="title">作品名順</option>
-                <option value="site">サイト順</option>
+                <option value="updated">更新順</option>
+                <option value="unread">更新差分順</option>
+                <option value="stale">未巡回順</option>
               </select>
-            </label>
-            <label>
-              タグ
-              <input id="rankingTag" type="search" placeholder="例：恋愛、宇宙" />
             </label>
             <label class="ranking-keyword">
               キーワード
-              <input id="rankingSearch" type="search" placeholder="作品名・サイト・タグ" />
+              <input id="rankingSearch" type="search" placeholder="作品名・サイト・メモ" />
             </label>
           </div>
         </form>
 
         <section class="ranking-results" aria-labelledby="rankingResultsTitle">
-          <h3 id="rankingResultsTitle">ランキング一覧</h3>
-          <div class="empty-state is-hidden" id="rankingEmpty">条件に合うランキングはありません。</div>
+          <h3 id="rankingResultsTitle">巡回候補</h3>
+          <div class="empty-state is-hidden" id="rankingEmpty">更新中の本棚作品はありません。</div>
           <div class="ranking-list" id="rankingList" aria-live="polite"></div>
         </section>
       </section>
