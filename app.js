@@ -48,8 +48,21 @@ const EXTERNAL_SEARCH_BUILDERS = {
   ノクターン: (keyword) => `https://noc.syosetu.com/search/search/?word=${encodeURIComponent(keyword)}`,
 };
 const RANKING_LINKS = {
-  "小説家になろう": "https://yomou.syosetu.com/rank/list/type/total_total/",
-  カクヨム: "https://kakuyomu.jp/rankings",
+  "小説家になろう": {
+    daily: "https://yomou.syosetu.com/rank/list/type/daily_total/",
+    weekly: "https://yomou.syosetu.com/rank/list/type/weekly_total/",
+    monthly: "https://yomou.syosetu.com/rank/list/type/monthly_total/",
+    quarterly: "https://yomou.syosetu.com/rank/list/type/quarter_total/",
+    yearly: "https://yomou.syosetu.com/rank/list/type/yearly_total/",
+    total: "https://yomou.syosetu.com/rank/list/type/total_total/",
+  },
+  カクヨム: {
+    daily: "https://kakuyomu.jp/rankings/all/daily",
+    weekly: "https://kakuyomu.jp/rankings/all/weekly",
+    monthly: "https://kakuyomu.jp/rankings/all/monthly",
+    yearly: "https://kakuyomu.jp/rankings/all/yearly",
+    total: "https://kakuyomu.jp/rankings/all/entire",
+  },
   ハーメルン: "https://syosetu.org/?mode=rank",
   Arcadia: "http://www.mai-net.net/",
   暁: "https://www.akatsuki-novels.com/",
@@ -175,6 +188,9 @@ function cacheElements() {
     rankingSite: document.querySelector("#rankingSite"),
     rankingPeriod: document.querySelector("#rankingPeriod"),
     fetchRanking: document.querySelector("#fetchRanking"),
+    rankingResultsPanel: document.querySelector("#rankingResultsPanel"),
+    rankingExternalPanel: document.querySelector("#rankingExternalPanel"),
+    rankingExternalLinks: document.querySelector("#rankingExternalLinks"),
     rankingList: document.querySelector("#rankingList"),
     rankingEmpty: document.querySelector("#rankingEmpty"),
     rankingEmptyMessage: document.querySelector("#rankingEmptyMessage"),
@@ -194,7 +210,7 @@ function populateStaticOptions() {
   populateCatalogSiteTabs();
   populateSelect(elements.novelSite, NOVEL_SITE_OPTIONS);
   populateSelect(elements.siteFilter, NOVEL_SITE_OPTIONS, { allLabel: "すべて" });
-  populateSelect(elements.rankingSite, SITE_OPTIONS);
+  populateSelect(elements.rankingSite, SITE_OPTIONS, { allLabel: "サイトを選択" });
   if (elements.rankingSite && SITE_OPTIONS.includes(state.rankingSite)) elements.rankingSite.value = state.rankingSite;
   if (elements.rankingPeriod) elements.rankingPeriod.value = state.rankingPeriod;
   if (elements.bookmarkletLink) elements.bookmarkletLink.href = createBookmarkletHref();
@@ -325,14 +341,22 @@ function bindRankingEvents() {
     state.rankingResults = [];
     state.rankingError = "";
     state.rankingHasFetched = false;
-    renderRanking();
+    if (state.rankingSite === DEFAULT_SITE && isNarouRankingApiPeriod(state.rankingPeriod)) {
+      fetchSelectedRanking();
+    } else {
+      renderRanking();
+    }
   });
   on(elements.rankingPeriod, "change", (event) => {
     state.rankingPeriod = event.target.value;
     state.rankingResults = [];
     state.rankingError = "";
     state.rankingHasFetched = false;
-    renderRanking();
+    if (state.rankingSite === DEFAULT_SITE && isNarouRankingApiPeriod(state.rankingPeriod)) {
+      fetchSelectedRanking();
+    } else {
+      renderRanking();
+    }
   });
   on(elements.fetchRanking, "click", fetchSelectedRanking);
 }
@@ -1277,6 +1301,7 @@ function buildNarouApiUrl(apiParams, callbackName) {
 }
 
 async function fetchNarouRanking(period) {
+  if (!isNarouRankingApiPeriod(period)) return [];
   const rankItems = await requestNarouRankApi({
     rtype: getNarouRankingType(period),
   });
@@ -1287,6 +1312,10 @@ async function fetchNarouRanking(period) {
     ...rankItem,
     novel: novelByNcode.get(rankItem.ncode) || null,
   }));
+}
+
+function isNarouRankingApiPeriod(period) {
+  return ["daily", "weekly", "monthly", "quarterly"].includes(period);
 }
 
 async function requestNarouRankApi(params) {
@@ -1341,13 +1370,22 @@ function getNarouRankingType(period) {
     weekly: "w",
     monthly: "m",
     quarterly: "q",
-  }[period] || "d";
-  return `${getRankingDateString()}-${suffix}`;
+  }[period];
+  if (!suffix) return "";
+  return `${getRankingDateStringForPeriod(period)}-${suffix}`;
 }
 
-function getRankingDateString() {
+function getRankingDateStringForPeriod(period) {
   const date = new Date(Date.now() + 9 * 60 * 60 * 1000);
   date.setUTCDate(date.getUTCDate() - 1);
+  if (period === "weekly") {
+    const day = date.getUTCDay();
+    const daysSinceTuesday = (day - 2 + 7) % 7;
+    date.setUTCDate(date.getUTCDate() - daysSinceTuesday);
+  }
+  if (period === "monthly" || period === "quarterly") {
+    date.setUTCDate(1);
+  }
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, "0");
   const day = String(date.getUTCDate()).padStart(2, "0");
@@ -2227,29 +2265,45 @@ function markAllRead() {
 
 function renderRanking() {
   const isNarou = state.rankingSite === DEFAULT_SITE;
-  const hasVisibleRankingContent = !isNarou || state.rankingResults.length > 0;
-  elements.rankingPeriod.disabled = !isNarou || state.rankingLoading;
+  const isPlaceholder = state.rankingSite === "all";
+  const isApiPeriod = isNarouRankingApiPeriod(state.rankingPeriod);
+  const showApiResults = isNarou && isApiPeriod;
+  const hasVisibleRankingContent = isPlaceholder ? false : (!showApiResults || state.rankingResults.length > 0);
+  elements.rankingPeriod.disabled = isPlaceholder || !isNarou || state.rankingLoading;
   elements.fetchRanking.disabled = state.rankingLoading;
-  elements.fetchRanking.textContent = state.rankingLoading ? "取得中..." : (isNarou ? "ランキング取得" : "ランキングページを開く");
+  elements.fetchRanking.textContent = state.rankingLoading
+    ? "取得中..."
+    : (showApiResults ? "ランキング取得" : "ランキングページを開く");
+  elements.rankingResultsPanel.classList.toggle("is-hidden", !isPlaceholder && !showApiResults);
+  elements.rankingExternalPanel.classList.toggle("is-hidden", isPlaceholder || showApiResults);
   elements.rankingEmpty.classList.toggle("is-hidden", hasVisibleRankingContent);
   elements.rankingEmptyMessage.innerHTML = getRankingEmptyMessage();
-  elements.rankingList.innerHTML = isNarou
+  elements.rankingList.innerHTML = showApiResults
     ? state.rankingResults.map(renderNarouRankingItem).join("")
-    : renderExternalRankingLinks();
+    : "";
+  elements.rankingExternalLinks.innerHTML = (!isPlaceholder && !showApiResults) ? renderExternalRankingLinks() : "";
   bindRankingActions();
 }
 
 function getRankingEmptyMessage() {
   if (state.rankingError) return escapeHtml(state.rankingError);
   if (state.rankingLoading) return '<span class="loading-spinner" aria-hidden="true"></span><span>ランキングを取得しています...</span>';
+  if (state.rankingSite === "all") return "サイトを選択してください。";
   if (state.rankingSite !== DEFAULT_SITE) return "API非対応サイトはランキングページへのリンクから確認できます。";
+  if (!isNarouRankingApiPeriod(state.rankingPeriod)) return "この種別はなろうランキングAPI対象外です。公式ランキングページを開いて確認してください。";
   if (state.rankingHasFetched) return "ランキング結果はありませんでした。種別を変えて再取得してください。";
   return "ランキング取得ボタンを押してください。";
 }
 
 async function fetchSelectedRanking() {
-  if (state.rankingSite !== DEFAULT_SITE) {
-    window.open(getRankingUrl(state.rankingSite), "_blank", "noopener");
+  if (state.rankingSite === "all") {
+    state.rankingError = "ランキングを見るサイトを選択してください。";
+    renderRanking();
+    return;
+  }
+
+  if (state.rankingSite !== DEFAULT_SITE || !isNarouRankingApiPeriod(state.rankingPeriod)) {
+    window.open(getRankingUrl(state.rankingSite, state.rankingPeriod), "_blank", "noopener");
     renderRanking();
     return;
   }
@@ -2302,18 +2356,26 @@ function renderNarouRankingItem(item) {
 }
 
 function renderExternalRankingLinks() {
+  const url = getRankingUrl(state.rankingSite, state.rankingPeriod);
   return `
     <article class="ranking-item">
       <div class="ranking-rank" aria-hidden="true">↗</div>
       <div class="ranking-body">
         <h3 class="novel-title">${escapeHtml(state.rankingSite)}のランキング</h3>
-        <p class="update-diff">このサイトは公式ランキングAPI未対応のため、ランキングページを外部サイトで開きます。</p>
+        <p class="update-diff">${escapeHtml(getExternalRankingDescription())}</p>
         <div class="card-actions update-actions">
-          <a class="primary-button reader-official-link" href="${escapeHtml(getRankingUrl(state.rankingSite))}" target="_blank" rel="noopener">${escapeHtml(state.rankingSite)}ランキングを開く</a>
+          <a class="primary-button reader-official-link" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(getRankingPeriodLabel(state.rankingPeriod))}ランキングを開く</a>
         </div>
       </div>
     </article>
   `;
+}
+
+function getExternalRankingDescription() {
+  if (state.rankingSite === DEFAULT_SITE) {
+    return `${getRankingPeriodLabel(state.rankingPeriod)}ランキングはAPI対象外のため、公式ランキングページで確認します。`;
+  }
+  return "このサイトは公式ランキングAPI未対応のため、ランキングページを外部サイトで開きます。";
 }
 
 function bindRankingActions() {
@@ -2330,8 +2392,13 @@ function addRankingNovelToLibrary(ncode) {
   render();
 }
 
-function getRankingUrl(site) {
-  return RANKING_LINKS[site] || SITE_HOME_URLS[site] || "https://www.google.com/search?q=web%E5%B0%8F%E8%AA%AC%20%E3%83%A9%E3%83%B3%E3%82%AD%E3%83%B3%E3%82%B0";
+function getRankingUrl(site, period = state.rankingPeriod) {
+  const rankingLink = RANKING_LINKS[site];
+  if (typeof rankingLink === "string") return rankingLink;
+  if (rankingLink && typeof rankingLink === "object") {
+    return rankingLink[period] || rankingLink.weekly || Object.values(rankingLink)[0];
+  }
+  return SITE_HOME_URLS[site] || "https://www.google.com/search?q=web%E5%B0%8F%E8%AA%AC%20%E3%83%A9%E3%83%B3%E3%82%AD%E3%83%B3%E3%82%B0";
 }
 
 function getRankingPeriodLabel(period) {
@@ -2340,6 +2407,8 @@ function getRankingPeriodLabel(period) {
     weekly: "週間",
     monthly: "月間",
     quarterly: "四半期",
+    yearly: "年間",
+    total: "累計",
   }[period] || "日間";
 }
 

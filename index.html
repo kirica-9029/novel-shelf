@@ -258,18 +258,24 @@
                 <option value="weekly">週間</option>
                 <option value="monthly">月間</option>
                 <option value="quarterly">四半期</option>
+                <option value="yearly">年間</option>
+                <option value="total">累計</option>
               </select>
             </label>
             <button class="primary-button" id="fetchRanking" type="button" aria-label="ランキングを取得">ランキング取得</button>
           </div>
         </form>
 
-        <section class="ranking-results" aria-labelledby="rankingResultsTitle">
+        <section class="ranking-results" id="rankingResultsPanel" aria-labelledby="rankingResultsTitle">
           <h3 id="rankingResultsTitle">ランキング結果</h3>
           <div class="empty-state is-hidden" id="rankingEmpty">
             <p id="rankingEmptyMessage">ランキング取得ボタンを押してください。</p>
           </div>
           <div class="ranking-list" id="rankingList" aria-live="polite"></div>
+        </section>
+        <section class="ranking-results is-hidden" id="rankingExternalPanel" aria-labelledby="rankingExternalTitle">
+          <h3 id="rankingExternalTitle">ランキングページへのリンク</h3>
+          <div class="ranking-list" id="rankingExternalLinks"></div>
         </section>
       </section>
 
