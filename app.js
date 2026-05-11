@@ -63,17 +63,53 @@ const RANKING_LINKS = {
   pixiv小説: "https://www.pixiv.net/novel/ranking.php",
   ノクターン: "https://noc.syosetu.com/rank/top/",
 };
-const NAROU_RANKING_GENRES = [
+const NAROU_GENRE_OPTIONS = [
   { value: "", label: "すべてのジャンル" },
   { value: "101", label: "異世界〔恋愛〕" },
   { value: "102", label: "現実世界〔恋愛〕" },
   { value: "201", label: "ハイファンタジー〔ファンタジー〕" },
   { value: "202", label: "ローファンタジー〔ファンタジー〕" },
-  { value: "403", label: "空想科学〔SF〕" },
-  { value: "305", label: "ホラー〔文芸〕" },
-  { value: "307", label: "コメディー〔文芸〕" },
+  { value: "301", label: "純文学〔文芸〕" },
   { value: "302", label: "ヒューマンドラマ〔文芸〕" },
+  { value: "303", label: "歴史〔文芸〕" },
   { value: "304", label: "推理〔文芸〕" },
+  { value: "305", label: "ホラー〔文芸〕" },
+  { value: "306", label: "アクション〔文芸〕" },
+  { value: "307", label: "コメディー〔文芸〕" },
+  { value: "401", label: "VRゲーム〔SF〕" },
+  { value: "402", label: "宇宙〔SF〕" },
+  { value: "403", label: "空想科学〔SF〕" },
+  { value: "404", label: "パニック〔SF〕" },
+  { value: "9901", label: "童話〔その他〕" },
+  { value: "9902", label: "詩〔その他〕" },
+  { value: "9903", label: "エッセイ〔その他〕" },
+  { value: "9904", label: "リプレイ〔その他〕" },
+  { value: "9999", label: "その他〔その他〕" },
+];
+const NAROU_ORDER_OPTIONS = [
+  { value: "new", label: "新着更新順" },
+  { value: "dailypoint", label: "日間人気順" },
+  { value: "weeklypoint", label: "週間人気順" },
+  { value: "monthlypoint", label: "月間人気順" },
+  { value: "quarterpoint", label: "四半期人気順" },
+  { value: "yearlypoint", label: "年間人気順" },
+  { value: "hyoka", label: "総合ポイント順" },
+  { value: "favnovelcnt", label: "ブックマーク順" },
+  { value: "reviewcnt", label: "レビュー数順" },
+  { value: "generalfirstup", label: "初回掲載順" },
+];
+const NAROU_TYPE_OPTIONS = [
+  { value: "", label: "すべて" },
+  { value: "r", label: "連載中" },
+  { value: "er", label: "完結済み" },
+  { value: "re", label: "連載作品すべて" },
+  { value: "t", label: "短編" },
+];
+const NAROU_LIMIT_OPTIONS = [
+  { value: "10", label: "10件" },
+  { value: "20", label: "20件" },
+  { value: "50", label: "50件" },
+  { value: "100", label: "100件" },
 ];
 const SITE_URL_PATTERNS = [
   { site: "ノクターン", pattern: /noc\.syosetu\.com/i },
@@ -92,6 +128,10 @@ const state = {
   activeView: "library",
   catalogSite: DEFAULT_SITE,
   catalogSearch: "",
+  catalogGenre: "",
+  catalogOrder: "new",
+  catalogType: "",
+  catalogLimit: "20",
   catalogResults: [],
   catalogLoading: false,
   catalogError: "",
@@ -153,8 +193,13 @@ function cacheElements() {
     catalogSiteTabs: document.querySelector("#catalogSiteTabs"),
     catalogSearchPanel: document.querySelector("#catalogSearchPanel"),
     catalogModeNote: document.querySelector("#catalogModeNote"),
+    catalogApiFilters: document.querySelector("#catalogApiFilters"),
     catalogSearchLabel: document.querySelector("#catalogSearchLabel"),
     catalogSearch: document.querySelector("#catalogSearch"),
+    catalogGenre: document.querySelector("#catalogGenre"),
+    catalogOrder: document.querySelector("#catalogOrder"),
+    catalogType: document.querySelector("#catalogType"),
+    catalogLimit: document.querySelector("#catalogLimit"),
     catalogExternalSearch: document.querySelector("#catalogExternalSearch"),
     catalogResults: document.querySelector("#catalogResults"),
     catalogEmpty: document.querySelector("#catalogEmpty"),
@@ -220,10 +265,18 @@ function populateStaticOptions() {
   populateSelect(elements.novelSite, NOVEL_SITE_OPTIONS);
   populateSelect(elements.siteFilter, NOVEL_SITE_OPTIONS, { allLabel: "すべて" });
   populateSelect(elements.rankingSite, SITE_OPTIONS);
-  populateSelectFromItems(elements.rankingGenre, NAROU_RANKING_GENRES);
+  populateSelectFromItems(elements.catalogGenre, NAROU_GENRE_OPTIONS);
+  populateSelectFromItems(elements.catalogOrder, NAROU_ORDER_OPTIONS);
+  populateSelectFromItems(elements.catalogType, NAROU_TYPE_OPTIONS);
+  populateSelectFromItems(elements.catalogLimit, NAROU_LIMIT_OPTIONS);
+  populateSelectFromItems(elements.rankingGenre, NAROU_GENRE_OPTIONS);
   if (elements.rankingSite && SITE_OPTIONS.includes(state.rankingSite)) elements.rankingSite.value = state.rankingSite;
   if (elements.rankingPeriod) elements.rankingPeriod.value = state.rankingPeriod;
   if (elements.rankingGenre) elements.rankingGenre.value = state.rankingGenre;
+  if (elements.catalogGenre) elements.catalogGenre.value = state.catalogGenre;
+  if (elements.catalogOrder) elements.catalogOrder.value = state.catalogOrder;
+  if (elements.catalogType) elements.catalogType.value = state.catalogType;
+  if (elements.catalogLimit) elements.catalogLimit.value = state.catalogLimit;
   if (elements.bookmarkletLink) elements.bookmarkletLink.href = createBookmarkletHref();
 }
 
@@ -301,6 +354,22 @@ function bindLibraryEvents() {
       state.catalogHasSearched = false;
       renderSearchWorkspace();
     }
+  });
+  on(elements.catalogGenre, "change", (event) => {
+    state.catalogGenre = event.target.value;
+    queueCatalogSearch(0);
+  });
+  on(elements.catalogOrder, "change", (event) => {
+    state.catalogOrder = event.target.value;
+    queueCatalogSearch(0);
+  });
+  on(elements.catalogType, "change", (event) => {
+    state.catalogType = event.target.value;
+    queueCatalogSearch(0);
+  });
+  on(elements.catalogLimit, "change", (event) => {
+    state.catalogLimit = event.target.value;
+    queueCatalogSearch(0);
   });
   on(elements.catalogExternalSearch, "click", openExternalSearchPage);
   on(elements.quickRegister, "click", registerNovelFromUrl);
@@ -1134,9 +1203,11 @@ function cleanBookmarkletQuery() {
 function renderCatalogMode() {
   const isApiMode = isApiSearchSite(state.catalogSite);
   elements.catalogSearchLabel.textContent = isApiMode ? `${state.catalogSite} API検索` : `${state.catalogSite} 外部検索`;
+  elements.catalogSearch.placeholder = isApiMode ? "キーワードを入力（空でも条件検索できます）" : "キーワードを入力";
   elements.catalogModeNote.textContent = isApiMode
-    ? `${state.catalogSite}は公式APIから作品情報を取得し、そのまま本棚へ追加できます。`
+    ? `${state.catalogSite}は公式APIから作品情報を取得します。キーワード、ジャンル、人気順、連載/完結で絞り込めます。`
     : `${state.catalogSite}は現時点ではAPI未対応のため、検索ページを開いて作品URLを貼り付け登録します。`;
+  elements.catalogApiFilters.classList.toggle("is-hidden", !isApiMode);
   elements.catalogExternalSearch.classList.toggle("is-hidden", isApiMode);
 }
 
@@ -1212,7 +1283,7 @@ function queueCatalogSearch(delay = 350) {
 }
 
 async function searchCatalog() {
-  if (!state.catalogSearch) {
+  if (isApiSearchSite(state.catalogSite) && !hasNarouSearchConditions()) {
     state.catalogResults = [];
     state.catalogError = "";
     state.catalogHasSearched = false;
@@ -1236,7 +1307,7 @@ async function searchCatalog() {
   renderSearchWorkspace();
 
   try {
-    state.catalogResults = await fetchNarouNovels(state.catalogSearch);
+    state.catalogResults = await fetchNarouNovels();
   } catch (error) {
     state.catalogResults = [];
     state.catalogError = getCatalogErrorMessage(error);
@@ -1248,6 +1319,10 @@ async function searchCatalog() {
 
 function isApiSearchSite(site) {
   return API_SEARCH_SITES.has(site);
+}
+
+function hasNarouSearchConditions() {
+  return Boolean(state.catalogSearch || state.catalogGenre || state.catalogType || state.catalogOrder !== "new" || state.catalogLimit !== "20");
 }
 
 function openExternalSearchPage() {
@@ -1272,12 +1347,16 @@ function buildExternalSearchUrl(site, keyword) {
   return `https://www.google.com/search?q=${encodeURIComponent(`${keyword} ${site}`)}`;
 }
 
-async function fetchNarouNovels(keyword) {
-  const data = await requestNarouApi({
-    word: keyword,
-    lim: "20",
+async function fetchNarouNovels() {
+  const params = {
+    lim: state.catalogLimit,
+    order: state.catalogOrder,
     of: "t-n-w-s-g-k-gl-ga",
-  });
+  };
+  if (state.catalogSearch) params.word = state.catalogSearch;
+  if (state.catalogGenre) params.genre = state.catalogGenre;
+  if (state.catalogType) params.type = state.catalogType;
+  const data = await requestNarouApi(params);
   return parseNarouApiResults(data);
 }
 
@@ -1420,7 +1499,7 @@ function getSearchResultStatusText() {
     if (state.catalogError) return state.catalogError;
     return "API未対応サイトは検索ページを新しいタブで開き、作品URLを貼り付けて本棚へ登録します。";
   }
-  if (!state.catalogSearch) return "キーワードを入力すると小説家になろう公式APIで検索します。";
+  if (!hasNarouSearchConditions()) return "キーワード、ジャンル、並び順、連載/完結を指定すると小説家になろう公式APIで検索します。";
   if (state.catalogLoading) return '<span class="loading-spinner" aria-hidden="true"></span><span>検索しています...</span>';
   if (state.catalogError) return state.catalogError;
   if (state.catalogHasSearched && state.catalogResults.length === 0) return "条件に合う作品はありません。";
@@ -1429,7 +1508,7 @@ function getSearchResultStatusText() {
 
 function shouldHideSearchResultStatus() {
   if (!isApiSearchSite(state.catalogSite)) return false;
-  if (!state.catalogSearch) return false;
+  if (!hasNarouSearchConditions()) return false;
   return !state.catalogLoading && !state.catalogError && state.catalogResults.length > 0;
 }
 

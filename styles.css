@@ -489,6 +489,11 @@ textarea {
   gap: 12px;
 }
 
+.narou-search-filters {
+  display: grid;
+  gap: 10px;
+}
+
 .catalog-result-panel {
   display: grid;
   gap: 10px;
@@ -1455,6 +1460,11 @@ textarea {
 
   .ranking-filter-grid {
     grid-template-columns: repeat(3, 1fr);
+    align-items: end;
+  }
+
+  .narou-search-filters {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     align-items: end;
   }
 

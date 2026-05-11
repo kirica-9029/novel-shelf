@@ -145,6 +145,24 @@
             <span id="catalogSearchLabel">小説家になろう検索</span>
             <input id="catalogSearch" type="search" placeholder="キーワードを入力" />
           </label>
+          <div class="narou-search-filters" id="catalogApiFilters" aria-label="小説家になろうAPI検索条件">
+            <label>
+              ジャンル
+              <select id="catalogGenre" aria-label="ジャンルで絞り込み"></select>
+            </label>
+            <label>
+              並び順
+              <select id="catalogOrder" aria-label="並び順を選択"></select>
+            </label>
+            <label>
+              連載/完結
+              <select id="catalogType" aria-label="連載または完結で絞り込み"></select>
+            </label>
+            <label>
+              取得件数
+              <select id="catalogLimit" aria-label="取得件数を選択"></select>
+            </label>
+          </div>
           <button class="primary-button is-hidden" id="catalogExternalSearch" type="button" aria-label="選択中の外部サイトで検索">外部検索ページを開く</button>
           <section class="catalog-result-panel" aria-labelledby="catalogResultsTitle">
             <div class="panel-title-row">
