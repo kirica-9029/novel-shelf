@@ -6,7 +6,10 @@ const APP_SHELL = [
   "./app.js",
   "./reader.js",
   "./manifest.json",
-  "./assets/icon.svg"
+  "./assets/icon.svg",
+  "./assets/ogp.png",
+  "./robots.txt",
+  "./sitemap.xml"
 ];
 
 self.addEventListener("install", (event) => {
