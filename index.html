@@ -241,7 +241,7 @@
         <div class="section-head">
           <div>
             <h2>ランキング</h2>
-            <p>小説家になろうは公式ランキングAPIで取得します。API非対応サイトはランキングページへのリンクを表示します。</p>
+            <p>小説家になろうは公式APIで期間・ジャンル別に取得します。API非対応サイトはランキングページへのリンクを表示します。</p>
           </div>
         </div>
 
@@ -251,7 +251,7 @@
               サイト
               <select id="rankingSite" aria-label="サイト"></select>
             </label>
-            <label>
+            <label id="rankingPeriodField">
               種別
               <select id="rankingPeriod" aria-label="ランキング種別">
                 <option value="daily">日間</option>
@@ -261,6 +261,10 @@
                 <option value="yearly">年間</option>
                 <option value="total">累計</option>
               </select>
+            </label>
+            <label id="rankingGenreField">
+              ジャンル
+              <select id="rankingGenre" aria-label="なろうランキングのジャンル"></select>
             </label>
             <button class="primary-button" id="fetchRanking" type="button" aria-label="ランキングを取得">ランキング取得</button>
           </div>
