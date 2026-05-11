@@ -294,8 +294,12 @@
             <p>データはブラウザの localStorage に保存されます。</p>
           </div>
         </div>
+        <section class="storage-note" aria-labelledby="storageNoteTitle">
+          <h3 id="storageNoteTitle">データ保存について</h3>
+          <p>データはこのブラウザ内に保存されます。ブラウザのデータ削除、端末変更、別ブラウザ利用時には引き継がれません。定期的にJSONを書き出してバックアップすることをおすすめします。</p>
+        </section>
         <div class="settings-grid">
-          <button class="ghost-button" id="exportData" type="button" aria-label="本棚データをJSONで書き出す">JSONを書き出し</button>
+          <button class="primary-button" id="exportData" type="button" aria-label="本棚データをJSONで書き出す">JSONを書き出し</button>
           <label class="file-button">
             JSONを読み込み
             <input id="importData" type="file" accept="application/json" />
