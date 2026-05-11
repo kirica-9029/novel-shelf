@@ -387,7 +387,9 @@ h2 {
 .novel-form,
 .toolbar,
 .catalog-search,
+.catalog-result-panel,
 .manual-register,
+.library-workspace,
 .ranking-controls,
 .updates-summary,
 .catalog-card,
@@ -454,27 +456,74 @@ textarea {
 .toolbar {
   padding: 12px;
   margin-bottom: 14px;
+  box-shadow: none;
 }
 
 .toolbar label {
   min-width: 0;
 }
 
-.catalog-search {
-  position: sticky;
-  top: 58px;
-  z-index: 4;
+.workspace-panel {
   display: grid;
   gap: 12px;
-  padding: 12px;
+  padding: 14px;
   margin-bottom: 14px;
+}
+
+.search-workspace {
+  border-color: color-mix(in srgb, var(--accent), var(--line) 62%);
+  background: color-mix(in srgb, var(--accent), var(--surface) 96%);
+}
+
+.register-workspace {
+  background: var(--surface);
+}
+
+.library-workspace {
+  border-color: color-mix(in srgb, var(--text), var(--line) 88%);
+  background: color-mix(in srgb, var(--surface-soft), var(--surface) 72%);
+}
+
+.catalog-search {
+  display: grid;
+  gap: 12px;
+}
+
+.catalog-result-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: var(--surface);
+}
+
+.panel-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panel-title-row h3,
+.panel-title-row h4 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.panel-kicker,
+.panel-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.panel-kicker {
+  color: var(--accent-strong);
+  font-weight: 800;
 }
 
 .manual-register {
   display: grid;
   gap: 10px;
-  padding: 12px;
-  margin-bottom: 14px;
 }
 
 .manual-register h3 {
@@ -656,6 +705,7 @@ textarea {
 .catalog-card {
   display: grid;
   gap: 12px;
+  border-color: color-mix(in srgb, var(--accent), var(--line) 76%);
 }
 
 .catalog-add-button {
@@ -804,6 +854,10 @@ textarea {
   margin: 0 0 2px;
   color: var(--muted);
   font-size: 0.78rem;
+}
+
+.library-workspace .novel-card {
+  background: var(--surface);
 }
 
 .card-top {

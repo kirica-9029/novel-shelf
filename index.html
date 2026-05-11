@@ -60,7 +60,7 @@
       <nav class="tab-nav" role="tablist" aria-label="メイン">
         <button class="tab-button is-active" id="libraryTab" type="button" role="tab" data-view="library" aria-controls="libraryView" aria-selected="true" aria-label="本棚を表示">本棚</button>
         <button class="tab-button" id="updatesTab" type="button" role="tab" data-view="updates" aria-controls="updatesView" aria-selected="false" tabindex="-1" aria-label="更新一覧を表示">更新</button>
-        <button class="tab-button" id="rankingTab" type="button" role="tab" data-view="ranking" aria-controls="rankingView" aria-selected="false" tabindex="-1" aria-label="巡回候補を表示">巡回</button>
+        <button class="tab-button" id="rankingTab" type="button" role="tab" data-view="ranking" aria-controls="rankingView" aria-selected="false" tabindex="-1" aria-label="読む順リストを表示">読む順</button>
         <button class="tab-button" id="settingsTab" type="button" role="tab" data-view="settings" aria-controls="settingsView" aria-selected="false" tabindex="-1" aria-label="設定を表示">設定</button>
       </nav>
 
@@ -70,17 +70,18 @@
         <div class="section-head">
           <div>
             <h2>本棚</h2>
-            <p>作品を検索して、ワンタップで本棚へ登録できます。</p>
+            <p>登録済み作品を管理します。作品検索と検索結果は下の専用エリアに分けて表示します。</p>
           </div>
           <button class="ghost-button" id="openAddForm" type="button" aria-label="作品を手入力で登録">手入力</button>
         </div>
         <p class="check-status is-hidden" id="bookmarkletStatus" aria-live="polite"></p>
 
-        <section class="catalog-search search-panel" id="catalogSearchPanel" aria-labelledby="catalogSearchTitle">
+        <section class="catalog-search search-panel workspace-panel search-workspace" id="catalogSearchPanel" aria-labelledby="catalogSearchTitle">
           <div class="section-head compact-head">
             <div>
-              <h3 id="catalogSearchTitle">外部サイトから作品を探す</h3>
-              <p id="catalogModeNote">小説家になろうはAPI検索、API未対応サイトは外部検索リンクで管理します。</p>
+              <p class="panel-kicker">検索エリア</p>
+              <h3 id="catalogSearchTitle">作品を探して本棚へ追加</h3>
+              <p id="catalogModeNote">小説家になろうは公式APIで検索し、API未対応サイトは外部検索ページを開きます。</p>
             </div>
           </div>
           <ul class="site-tabs" id="catalogSiteTabs" aria-label="小説投稿サイト"></ul>
@@ -88,13 +89,23 @@
             <span id="catalogSearchLabel">小説家になろう検索</span>
             <input id="catalogSearch" type="search" placeholder="キーワードを入力" />
           </label>
-          <button class="primary-button is-hidden" id="catalogExternalSearch" type="button" aria-label="選択中の外部サイトで検索">外部サイトで検索</button>
-          <div class="empty-state is-hidden" id="catalogEmpty" role="status" aria-live="polite"></div>
-          <div class="catalog-results" id="catalogResults" aria-live="polite"></div>
+          <button class="primary-button is-hidden" id="catalogExternalSearch" type="button" aria-label="選択中の外部サイトで検索">外部検索ページを開く</button>
+          <section class="catalog-result-panel" aria-labelledby="catalogResultsTitle">
+            <div class="panel-title-row">
+              <div>
+                <p class="panel-kicker">検索結果</p>
+                <h4 id="catalogResultsTitle">本棚にはまだ追加されません</h4>
+              </div>
+              <p class="panel-note">追加ボタンを押した作品だけ本棚へ保存します。</p>
+            </div>
+            <div class="empty-state is-hidden" id="catalogEmpty" role="status" aria-live="polite"></div>
+            <div class="catalog-results" id="catalogResults" aria-live="polite"></div>
+          </section>
         </section>
 
-        <section class="manual-register" id="manualRegisterPanel" aria-labelledby="manualRegisterTitle">
+        <section class="manual-register workspace-panel register-workspace" id="manualRegisterPanel" aria-labelledby="manualRegisterTitle">
           <div>
+            <p class="panel-kicker">URL登録</p>
             <h3 id="manualRegisterTitle">URL・手入力で登録</h3>
             <p>API未対応サイトや検索で見つからない作品は、作品URLから本棚へ追加できます。</p>
           </div>
@@ -142,52 +153,61 @@
           </div>
         </form>
 
-        <div class="toolbar">
-          <label class="search-box">
-            本棚内検索
-            <input id="librarySearch" type="search" placeholder="作品名・サイト・メモ" />
-          </label>
-          <label>
-            サイト
-            <select id="siteFilter" aria-label="サイト別に絞り込み"></select>
-          </label>
-          <label>
-            状態
-            <select id="libraryStatusFilter" aria-label="状態で絞り込み">
-              <option value="all">すべて</option>
-              <option value="unread">未読あり</option>
-              <option value="updated">更新あり</option>
-              <option value="favorite">お気に入り</option>
-            </select>
-          </label>
-          <label>
-            並び替え
-            <select id="librarySort" aria-label="本棚の並び替え">
-              <option value="updated">更新日順</option>
-              <option value="registered">登録日順</option>
-              <option value="title">タイトル順</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="empty-state is-hidden" id="libraryEmpty">
-          <p id="libraryEmptyMessage">まだ作品がありません。まずは作品URLを貼り付けるか、小説家になろう検索から本棚に追加してください。</p>
-          <div class="empty-actions">
-            <button class="primary-button" id="libraryEmptyRegister" type="button">作品URLを登録</button>
-            <button class="ghost-button" id="libraryEmptySearch" type="button">小説家になろうで検索</button>
+        <section class="library-workspace workspace-panel" aria-labelledby="libraryListTitle">
+          <div class="panel-title-row">
+            <div>
+              <p class="panel-kicker">登録済み作品</p>
+              <h3 id="libraryListTitle">本棚一覧</h3>
+            </div>
+            <p class="panel-note">検索結果とは別に、保存済みの作品だけを表示します。</p>
           </div>
-        </div>
-        <div class="novel-list" id="novelList" aria-live="polite"></div>
+          <div class="toolbar">
+            <label class="search-box">
+              本棚内検索
+              <input id="librarySearch" type="search" placeholder="作品名・サイト・メモ" />
+            </label>
+            <label>
+              サイト
+              <select id="siteFilter" aria-label="サイト別に絞り込み"></select>
+            </label>
+            <label>
+              状態
+              <select id="libraryStatusFilter" aria-label="状態で絞り込み">
+                <option value="all">すべて</option>
+                <option value="unread">未読あり</option>
+                <option value="updated">更新あり</option>
+                <option value="favorite">お気に入り</option>
+              </select>
+            </label>
+            <label>
+              並び替え
+              <select id="librarySort" aria-label="本棚の並び替え">
+                <option value="updated">更新日順</option>
+                <option value="registered">登録日順</option>
+                <option value="title">タイトル順</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="empty-state is-hidden" id="libraryEmpty">
+            <p id="libraryEmptyMessage">まだ作品がありません。まずは作品URLを貼り付けるか、小説家になろう検索から本棚に追加してください。</p>
+            <div class="empty-actions">
+              <button class="primary-button" id="libraryEmptyRegister" type="button">作品URLを登録</button>
+              <button class="ghost-button" id="libraryEmptySearch" type="button">小説家になろうで検索</button>
+            </div>
+          </div>
+          <div class="novel-list" id="novelList" aria-live="polite"></div>
+        </section>
       </section>
 
       <section class="view" id="updatesView" role="tabpanel" aria-labelledby="updatesTab" data-view-panel="updates">
         <div class="section-head">
           <div>
             <h2>更新</h2>
-            <p>本棚の小説家になろう作品をAPIで確認し、更新がある作品を優先表示します。</p>
+            <p>登録済み作品の最新話情報を確認します。外部サイトの新着取得やおすすめ巡回は行いません。</p>
           </div>
           <div class="section-actions">
-            <button class="primary-button" id="checkUpdates" type="button" aria-label="小説家になろう作品の更新を確認">更新確認</button>
+            <button class="primary-button" id="checkUpdates" type="button" aria-label="登録済み作品の最新話を確認">登録済み作品を更新確認</button>
             <button class="ghost-button" id="markAllRead" type="button" aria-label="すべての更新を既読にする">全て既読</button>
           </div>
         </div>
@@ -210,12 +230,12 @@
       <section class="view" id="rankingView" role="tabpanel" aria-labelledby="rankingTab" data-view-panel="ranking">
         <div class="section-head">
           <div>
-            <h2>更新優先リスト</h2>
-            <p>本棚の更新作品をリアルタイムに並べ替えて巡回できます。</p>
+            <h2>読む順リスト</h2>
+            <p>更新確認で未読が分かった登録済み作品だけを、読む順に並べ替えて開けます。</p>
           </div>
         </div>
 
-        <form class="ranking-controls" id="rankingControls" role="search" aria-label="更新作品の絞り込み">
+        <form class="ranking-controls" id="rankingControls" role="search" aria-label="読む順リストの絞り込み">
           <div class="ranking-filter-grid">
             <label>
               サイト
@@ -223,10 +243,10 @@
             </label>
             <label>
               ソート
-              <select id="rankingSort" aria-label="ソート">
+              <select id="rankingSort" aria-label="読む順リストのソート">
                 <option value="updated">更新順</option>
                 <option value="unread">更新差分順</option>
-                <option value="stale">未巡回順</option>
+                <option value="stale">未閲覧順</option>
               </select>
             </label>
             <label class="ranking-keyword">
@@ -237,9 +257,9 @@
         </form>
 
         <section class="ranking-results" aria-labelledby="rankingResultsTitle">
-          <h3 id="rankingResultsTitle">巡回候補</h3>
+          <h3 id="rankingResultsTitle">読む候補</h3>
           <div class="empty-state is-hidden" id="rankingEmpty">
-            <p>巡回候補はありません。更新確認後、未読更新がある作品がここに表示されます。</p>
+            <p>読む候補はありません。更新確認後、未読更新がある登録済み作品がここに表示されます。</p>
             <div class="empty-actions">
               <button class="primary-button" id="rankingEmptyCheck" type="button">更新確認</button>
             </div>
@@ -319,7 +339,7 @@
           </li>
           <li>
             <strong>更新を確認</strong>
-            <span>更新タブの「更新確認」で、登録済みなろう作品の最新話数を確認できます。</span>
+            <span>更新タブの「登録済み作品を更新確認」で、登録済みなろう作品の最新話数を確認できます。</span>
           </li>
         </ol>
         <button class="primary-button tutorial-start" id="tutorialComplete" type="button" aria-label="チュートリアルを完了して始める">はじめる</button>

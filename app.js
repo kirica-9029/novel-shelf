@@ -242,10 +242,10 @@ function bindLibraryEvents() {
       state.catalogResults = [];
       state.catalogError = "";
       state.catalogHasSearched = false;
-      renderCatalogResults();
+      renderSearchWorkspace();
     }
   });
-  elements.catalogExternalSearch.addEventListener("click", openExternalCatalogSearch);
+  elements.catalogExternalSearch.addEventListener("click", openExternalSearchPage);
   elements.quickRegister.addEventListener("click", registerNovelFromUrl);
   elements.quickUrl.addEventListener("input", () => {
     if (!elements.novelForm.classList.contains("is-hidden")) return;
@@ -260,7 +260,7 @@ function bindLibraryEvents() {
     state.catalogError = "";
     state.catalogHasSearched = false;
     if (isApiSearchSite(state.catalogSite)) queueCatalogSearch(0);
-    renderCatalogResults();
+    renderSearchWorkspace();
   });
   elements.cancelEdit.addEventListener("click", hideForm);
   elements.novelForm.addEventListener("submit", saveNovelFromForm);
@@ -287,7 +287,7 @@ function bindLibraryEvents() {
 }
 
 function bindUpdateEvents() {
-  elements.checkUpdates.addEventListener("click", checkNarouUpdates);
+  elements.checkUpdates.addEventListener("click", checkRegisteredNovelUpdates);
   elements.markAllRead.addEventListener("click", markAllRead);
 }
 
@@ -320,7 +320,7 @@ function bindRankingControl(element, stateKey, eventName, options = {}) {
   element.addEventListener(eventName, (event) => {
     const value = options.trim ? event.target.value.trim() : event.target.value;
     state[stateKey] = value;
-    renderRanking();
+    renderReadingQueue();
   });
 }
 
@@ -549,7 +549,7 @@ function focusUrlRegister() {
 function focusNarouSearch() {
   switchView("library");
   state.catalogSite = DEFAULT_SITE;
-  renderCatalogResults();
+  renderSearchWorkspace();
   scrollToPanel(elements.catalogSearchPanel);
   elements.catalogSearch.focus();
 }
@@ -907,23 +907,23 @@ function hasUpdateState(novel) {
 }
 
 function render() {
-  renderCatalogResults();
+  renderSearchWorkspace();
   renderLibrary();
   renderUpdates();
-  renderRanking();
+  renderReadingQueue();
   renderReader();
 }
 
-function renderCatalogResults() {
+function renderSearchWorkspace() {
   renderCatalogMode();
-  elements.catalogEmpty.innerHTML = getCatalogStatusText();
+  elements.catalogEmpty.innerHTML = getSearchResultStatusText();
   elements.catalogEmpty.classList.toggle("is-loading", state.catalogLoading);
-  elements.catalogEmpty.classList.toggle("is-hidden", shouldHideCatalogStatus());
-  elements.catalogResults.innerHTML = state.catalogResults.map(renderCatalogCard).join("");
+  elements.catalogEmpty.classList.toggle("is-hidden", shouldHideSearchResultStatus());
+  elements.catalogResults.innerHTML = state.catalogResults.map(renderSearchResultCard).join("");
   elements.catalogSiteTabs.querySelectorAll("[data-catalog-site]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.catalogSite === state.catalogSite);
   });
-  bindCatalogActions();
+  bindSearchResultActions();
 }
 
 function processBookmarkletParams() {
@@ -1118,7 +1118,7 @@ async function searchCatalog() {
     state.catalogError = "";
     state.catalogHasSearched = false;
     state.catalogLoading = false;
-    renderCatalogResults();
+    renderSearchWorkspace();
     return;
   }
 
@@ -1127,14 +1127,14 @@ async function searchCatalog() {
     state.catalogError = "";
     state.catalogHasSearched = true;
     state.catalogLoading = false;
-    renderCatalogResults();
+    renderSearchWorkspace();
     return;
   }
 
   state.catalogLoading = true;
   state.catalogError = "";
   state.catalogHasSearched = true;
-  renderCatalogResults();
+  renderSearchWorkspace();
 
   try {
     state.catalogResults = await fetchNarouNovels(state.catalogSearch);
@@ -1143,7 +1143,7 @@ async function searchCatalog() {
     state.catalogError = getCatalogErrorMessage(error);
   } finally {
     state.catalogLoading = false;
-    renderCatalogResults();
+    renderSearchWorkspace();
   }
 }
 
@@ -1151,12 +1151,12 @@ function isApiSearchSite(site) {
   return API_SEARCH_SITES.has(site);
 }
 
-function openExternalCatalogSearch() {
+function openExternalSearchPage() {
   const keyword = state.catalogSearch.trim();
   if (!keyword) {
     state.catalogError = "検索キーワードを入力してください。";
     state.catalogHasSearched = true;
-    renderCatalogResults();
+    renderSearchWorkspace();
     return;
   }
 
@@ -1164,7 +1164,7 @@ function openExternalCatalogSearch() {
   window.open(url, "_blank", "noopener");
   state.catalogError = "";
   state.catalogHasSearched = true;
-  renderCatalogResults();
+  renderSearchWorkspace();
 }
 
 function buildExternalSearchUrl(site, keyword) {
@@ -1273,7 +1273,7 @@ function toIsoDateOrNow(value) {
   return Number.isNaN(timestamp) ? new Date().toISOString() : new Date(timestamp).toISOString();
 }
 
-function getCatalogStatusText() {
+function getSearchResultStatusText() {
   if (!isApiSearchSite(state.catalogSite)) {
     if (state.catalogError) return state.catalogError;
     return "API未対応サイトは検索ページを新しいタブで開き、作品URLを貼り付けて本棚へ登録します。";
@@ -1285,7 +1285,7 @@ function getCatalogStatusText() {
   return "";
 }
 
-function shouldHideCatalogStatus() {
+function shouldHideSearchResultStatus() {
   if (!isApiSearchSite(state.catalogSite)) return false;
   if (!state.catalogSearch) return false;
   return !state.catalogLoading && !state.catalogError && state.catalogResults.length > 0;
@@ -1296,7 +1296,7 @@ function getCatalogErrorMessage(error) {
   return "小説家になろうAPIを取得できませんでした。時間を置いて再検索してください。";
 }
 
-function renderCatalogCard(item) {
+function renderSearchResultCard(item) {
   const alreadyAdded = Boolean(findDuplicateNovel(item));
   const addButtonLabel = alreadyAdded ? `${item.title}は登録済みです` : `${item.title}を本棚に追加`;
   const chips = getNarouMetaChips(item).map((chip) => `<span class="tag-chip">${escapeHtml(chip)}</span>`).join("");
@@ -1335,9 +1335,9 @@ function getNarouMetaChips(item) {
     .slice(0, 8);
 }
 
-function bindCatalogActions() {
+function bindSearchResultActions() {
   elements.catalogResults.querySelectorAll("[data-catalog-id]").forEach((button) => {
-    button.addEventListener("click", () => addCatalogNovel(button.dataset.catalogId));
+    button.addEventListener("click", () => addSearchResultToLibrary(button.dataset.catalogId));
   });
   elements.catalogResults.querySelectorAll("[data-story-toggle]").forEach((button) => {
     button.addEventListener("click", () => toggleCatalogStory(button));
@@ -1353,7 +1353,7 @@ function toggleCatalogStory(button) {
   button.textContent = expanded ? "あらすじを開く" : "あらすじを閉じる";
 }
 
-function addCatalogNovel(catalogId) {
+function addSearchResultToLibrary(catalogId) {
   const item = state.catalogResults.find((catalogItem) => catalogItem.id === catalogId);
   if (!item || findDuplicateNovel(item)) return;
 
@@ -1433,7 +1433,7 @@ function addNarouItemFromUrl(item) {
 function showCatalogMessage(message) {
   state.catalogError = message;
   state.catalogHasSearched = true;
-  renderCatalogResults();
+  renderSearchWorkspace();
 }
 
 function renderLibrary() {
@@ -1459,7 +1459,7 @@ function renderUpdates() {
   const updates = getUpdateTabNovels();
   renderUpdateCheckStatus();
   elements.checkUpdates.disabled = state.updateChecking;
-  elements.checkUpdates.textContent = state.updateChecking ? "確認中..." : "更新確認";
+  elements.checkUpdates.textContent = state.updateChecking ? "確認中..." : "登録済み作品を更新確認";
   elements.updatesSummary.classList.toggle("is-hidden", updates.length === 0);
   elements.updatesSummary.innerHTML = renderUpdatesSummary(updates);
   elements.updatesEmpty.classList.toggle("is-hidden", updates.length > 0);
@@ -1475,7 +1475,7 @@ function renderUpdateCheckStatus() {
   elements.updateCheckStatus.classList.toggle("is-error", Boolean(state.updateCheckError));
 }
 
-async function checkNarouUpdates() {
+async function checkRegisteredNovelUpdates() {
   const apiTargets = state.novels.filter(isNarouNovelWithNcode);
   const now = Date.now();
   const targets = apiTargets.filter((novel) => {
@@ -2106,20 +2106,20 @@ function markAllRead() {
   render();
 }
 
-function renderRanking() {
-  const hasSourceData = hasRankingSourceData();
-  const items = getRankingItems();
+function renderReadingQueue() {
+  const hasSourceData = hasReadingQueueSourceData();
+  const items = getReadingQueueItems();
   elements.rankingControls.classList.toggle("is-hidden", !hasSourceData);
   elements.rankingEmpty.classList.toggle("is-hidden", items.length > 0);
-  elements.rankingList.innerHTML = items.map(renderRankingItem).join("");
+  elements.rankingList.innerHTML = items.map(renderReadingQueueItem).join("");
   bindCardActions(elements.rankingList);
 }
 
-function hasRankingSourceData() {
+function hasReadingQueueSourceData() {
   return state.novels.some((novel) => getUnreadChapterCount(novel) > 0 || novel.unread);
 }
 
-function getRankingItems() {
+function getReadingQueueItems() {
   const keyword = normalizeText(state.rankingSearch);
 
   return state.novels
@@ -2139,7 +2139,7 @@ function sortRankingItems(a, b) {
   return compareByUpdateDate(a, b);
 }
 
-function renderRankingItem(novel, index) {
+function renderReadingQueueItem(novel, index) {
   const unreadCount = getUnreadChapterCount(novel);
   const nextChapter = getNextReadableChapter(novel);
   const continueButton = novel.url ? renderContinueLink(novel) : "";
@@ -2151,10 +2151,10 @@ function renderRankingItem(novel, index) {
       <div class="ranking-body">
         <div class="card-top">
           <div>
-            <p class="ranking-source">本棚データからリアルタイム更新</p>
+            <p class="ranking-source">登録済み作品の読む順</p>
             <h3 class="novel-title">${escapeHtml(novel.title)}</h3>
           </div>
-          <span class="new-label">NEW</span>
+          <span class="new-label">未読</span>
         </div>
         <div class="meta-row">
           <span class="badge">${escapeHtml(novel.site)}</span>
@@ -2164,10 +2164,10 @@ function renderRankingItem(novel, index) {
         </div>
         <p class="update-diff">${escapeHtml(getUpdateDiffText(novel, unreadCount))}</p>
         <p class="update-time">最終更新：${escapeHtml(formatUpdatedAt(novel.generalLastup || novel.updatedAt))}</p>
-        ${novel.lastViewedAt ? `<p class="update-time">最終巡回：${escapeHtml(formatUpdatedAt(novel.lastViewedAt))}</p>` : ""}
+        ${novel.lastViewedAt ? `<p class="update-time">最終閲覧：${escapeHtml(formatUpdatedAt(novel.lastViewedAt))}</p>` : ""}
         <div class="card-actions update-actions">
           ${continueButton}
-          <button class="text-button" type="button" data-action="read" aria-label="${escapeHtml(`${novel.title}を既読にする`)}">既読</button>
+          <button class="text-button" type="button" data-action="read" aria-label="${escapeHtml(`${novel.title}を最新まで読了にする`)}">最新まで読了</button>
         </div>
       </div>
     </article>
