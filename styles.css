@@ -710,7 +710,44 @@ textarea {
 
 .update-card {
   display: grid;
+  grid-template-columns: auto 1fr;
   gap: 10px;
+}
+
+.update-card .update-actions {
+  grid-column: 2;
+}
+
+.drag-handle {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  cursor: grab;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+  touch-action: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.update-card-chosen {
+  border-color: color-mix(in srgb, var(--accent), var(--line) 35%);
+}
+
+.update-card-ghost {
+  opacity: 0.45;
+}
+
+.update-card-drag {
+  box-shadow: var(--shadow);
 }
 
 .update-title-row {

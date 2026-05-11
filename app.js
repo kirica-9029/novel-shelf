@@ -52,6 +52,7 @@ const SITE_URL_PATTERNS = [
 
 const state = {
   novels: [],
+  updateOrder: [],
   activeView: "library",
   catalogSite: DEFAULT_SITE,
   catalogSearch: "",
@@ -74,6 +75,7 @@ const state = {
 
 const elements = {};
 let catalogSearchTimer = 0;
+let updatesSortable = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   cacheElements();
@@ -295,6 +297,7 @@ function saveState() {
   const payload = {
     version: 1,
     novels: state.novels,
+    updateOrder: state.updateOrder,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 }
@@ -302,6 +305,7 @@ function saveState() {
 function normalizeStoredData(savedData) {
   const novels = Array.isArray(savedData) ? savedData : savedData?.novels;
   if (!Array.isArray(novels)) return getInitialNovels();
+  state.updateOrder = normalizeUpdateOrder(savedData?.updateOrder);
   return dedupeNovels(novels.map(sanitizeNovel));
 }
 
@@ -309,6 +313,11 @@ function parseImportedNovels(importedData) {
   const novels = Array.isArray(importedData) ? importedData : importedData?.novels;
   if (!Array.isArray(novels)) throw new Error("Invalid data");
   return dedupeNovels(novels.map(sanitizeNovel));
+}
+
+function normalizeUpdateOrder(order) {
+  if (!Array.isArray(order)) return [];
+  return order.map((id) => String(id || "")).filter(Boolean);
 }
 
 function getInitialNovels() {
@@ -1242,6 +1251,7 @@ function renderUpdates() {
   elements.updatesEmpty.classList.toggle("is-hidden", updates.length > 0);
   elements.updatesList.innerHTML = updates.map(renderUpdateCard).join("");
   bindCardActions(elements.updatesList);
+  initializeUpdatesSortable(updates);
 }
 
 function renderUpdateCheckStatus() {
@@ -1339,9 +1349,17 @@ function createNarouUpdatePatch(novel, latestItem, checkedAt) {
 }
 
 function getUpdatedNovels() {
+  const orderIndex = new Map(state.updateOrder.map((id, index) => [id, index]));
   return state.novels
     .filter((novel) => novel.unread)
-    .sort(compareByUpdateDate);
+    .sort((a, b) => compareByUpdatePriority(a, b, orderIndex));
+}
+
+function compareByUpdatePriority(a, b, orderIndex) {
+  const aIndex = orderIndex.has(a.id) ? orderIndex.get(a.id) : Number.POSITIVE_INFINITY;
+  const bIndex = orderIndex.has(b.id) ? orderIndex.get(b.id) : Number.POSITIVE_INFINITY;
+  if (aIndex !== bIndex) return aIndex - bIndex;
+  return compareByUpdateDate(a, b);
 }
 
 function compareByUpdateDate(a, b) {
@@ -1358,7 +1376,7 @@ function renderUpdatesSummary(updates) {
   return `
     <span class="badge unread">NEW ${updates.length}件</span>
     <span class="badge">未読: ${totalDiff}話</span>
-    <span class="muted">更新順で巡回できます</span>
+    <span class="muted">ドラッグで優先順を変更できます</span>
   `;
 }
 
@@ -1373,6 +1391,7 @@ function renderUpdateCard(novel) {
 
   return `
     <article class="update-card" data-id="${novel.id}">
+      <button class="drag-handle" type="button" aria-label="${escapeHtml(`${novel.title}を並び替える`)}">⋮⋮</button>
       <div class="update-main">
         <div class="update-title-row">
           <span class="new-label">NEW</span>
@@ -1398,6 +1417,37 @@ function renderUpdateCard(novel) {
       </div>
     </article>
   `;
+}
+
+function initializeUpdatesSortable(updates) {
+  if (updatesSortable) {
+    updatesSortable.destroy();
+    updatesSortable = null;
+  }
+
+  if (!updates.length || typeof Sortable === "undefined") return;
+
+  elements.updatesList.setAttribute("aria-label", "更新リスト。ドラッグで優先順に並び替えできます。");
+  updatesSortable = Sortable.create(elements.updatesList, {
+    animation: 150,
+    handle: ".drag-handle",
+    draggable: ".update-card",
+    ghostClass: "update-card-ghost",
+    chosenClass: "update-card-chosen",
+    dragClass: "update-card-drag",
+    onEnd: saveUpdateOrderFromDom,
+  });
+}
+
+function saveUpdateOrderFromDom() {
+  const visibleIds = [...elements.updatesList.querySelectorAll(".update-card")]
+    .map((card) => card.dataset.id)
+    .filter(Boolean);
+  const unreadIds = new Set(state.novels.filter((novel) => novel.unread).map((novel) => novel.id));
+  const remainingIds = state.updateOrder.filter((id) => unreadIds.has(id) && !visibleIds.includes(id));
+  state.updateOrder = [...visibleIds, ...remainingIds];
+  saveState();
+  renderUpdates();
 }
 
 function getUpdateDiffText(novel, unreadCount) {
