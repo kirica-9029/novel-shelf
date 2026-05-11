@@ -941,6 +941,36 @@ textarea {
   font-size: 0.92rem;
 }
 
+.faq-section {
+  margin: 18px 0 0;
+}
+
+.faq-list {
+  display: grid;
+  gap: 8px;
+}
+
+.faq-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.faq-item summary {
+  padding: 12px 14px;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.faq-item p {
+  margin: 0;
+  padding: 0 14px 14px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
 .bookmarklet-box {
   display: grid;
   gap: 8px;
@@ -1071,6 +1101,7 @@ textarea {
 
   .tab-nav,
   .supported-sites,
+  .faq-section,
   .view {
     grid-column: 1;
   }
