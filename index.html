@@ -258,6 +258,7 @@
         <section class="storage-note" aria-labelledby="storageNoteTitle">
           <h3 id="storageNoteTitle">データ保存について</h3>
           <p>データはこのブラウザ内に保存されます。ブラウザのデータ削除、端末変更、別ブラウザ利用時には引き継がれません。定期的にJSONを書き出してバックアップすることをおすすめします。</p>
+          <p>公式API/RSSが提供されているサイトのみ自動取得します。本文・目次・ログイン後ページは取得しません。</p>
         </section>
         <div class="settings-grid">
           <button class="primary-button" id="exportData" type="button" aria-label="本棚データをJSONで書き出す">JSONを書き出し</button>
@@ -269,7 +270,7 @@
         </div>
         <section class="bookmarklet-box" aria-labelledby="bookmarkletTitle">
           <h3 id="bookmarkletTitle">読了登録ブックマークレット</h3>
-          <p>なろう、ノクターン、カクヨム、ハーメルン、Arcadia、暁、pixiv小説、ノベルアップ+の話ページで実行すると、このアプリに戻って読了位置だけを保存します。本文は取得・保存しません。</p>
+          <p>話ページで実行すると、現在URL、ページタイトル、URLから推定できる話数、読了日時だけを保存します。本文は取得・保存しません。話数を推定できない場合は、作品編集から手入力してください。</p>
           <a class="primary-button bookmarklet-link" id="bookmarkletLink" href="#" aria-label="読了登録ブックマークレット">読了登録</a>
           <p class="muted">このリンクをブックマークバーへ登録して使います。</p>
         </section>

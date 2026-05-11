@@ -9,6 +9,13 @@ const SEARCH_SITE_OPTIONS = SITE_OPTIONS;
 const NOVEL_SITE_OPTIONS = [...SITE_OPTIONS, OTHER_SITE];
 const NAROU_API_URL = "https://api.syosetu.com/novelapi/api/";
 const NAROU_JSONP_TIMEOUT = 12000;
+const NAROU_CHECK_INTERVAL_MS = 10 * 60 * 1000;
+const CHECK_MODE_API = "api";
+const CHECK_MODE_MANUAL = "manual";
+const STATUS_UNREAD = "unread";
+const STATUS_UP_TO_DATE = "upToDate";
+const STATUS_FAILED = "failed";
+const STATUS_MANUAL = "manual";
 const SITE_HOME_URLS = {
   "小説家になろう": "https://syosetu.com/",
   カクヨム: "https://kakuyomu.jp/",
@@ -27,7 +34,7 @@ const SITE_CARD_META = {
   暁: { icon: "暁", description: "外部検索とURL登録で読了位置を管理します。" },
   "ノベルアップ+": { icon: "N+", description: "検索ページを開いて作品URLを本棚に保存します。" },
   pixiv小説: { icon: "P", description: "pixiv小説の検索ページから作品を探します。" },
-  ノクターン: { icon: "夜", description: "なろう系URLとしてNコード読了管理に対応します。" },
+  ノクターン: { icon: "夜", description: "URL登録と読了位置の手動管理に対応します。" },
 };
 const API_SEARCH_SITES = new Set([DEFAULT_SITE]);
 const EXTERNAL_SEARCH_BUILDERS = {
@@ -357,14 +364,36 @@ function getInitialNovels() {
   return [];
 }
 
+function getCheckMode(novel) {
+  if (novel?.checkMode === CHECK_MODE_API || novel?.checkMode === CHECK_MODE_MANUAL) return novel.checkMode;
+  return normalizeNcode(novel?.ncode || "") ? CHECK_MODE_API : CHECK_MODE_MANUAL;
+}
+
+function deriveNovelStatus(novel) {
+  if (novel?.status === STATUS_FAILED || novel?.updateCheckStatus === "error") return STATUS_FAILED;
+  if (getCheckMode(novel) === CHECK_MODE_MANUAL) return STATUS_MANUAL;
+  return getUnreadChapterCount(novel) > 0 ? STATUS_UNREAD : STATUS_UP_TO_DATE;
+}
+
+function isApiManagedNovel(novel) {
+  return getCheckMode(novel) === CHECK_MODE_API && Boolean(normalizeNcode(novel?.ncode));
+}
+
+function isManualManagedNovel(novel) {
+  return getCheckMode(novel) === CHECK_MODE_MANUAL;
+}
+
 function createNovel(values) {
   const latestChapter = toChapterNumber(values.generalAllNo ?? values.latestChapter ?? values.latest);
-  const readChapter = toChapterNumber(values.lastReadEpisode ?? values.readChapter ?? values.position);
+  const readChapter = toChapterNumber(values.lastReadChapter ?? values.lastReadEpisode ?? values.readChapter ?? values.position);
   const sourceInfo = extractSourceInfoFromUrl(values.url);
-  const ncode = normalizeNcode(values.ncode || sourceInfo.workId) || extractNarouNcode(values.url);
+  const ncode = normalizeNcode(values.ncode || (sourceInfo.site === "narou" ? sourceInfo.workId : "")) || extractNarouNcode(values.url);
   const site = ncode ? DEFAULT_SITE : values.site;
   const generalLastup = values.generalLastup || values.lastup || values.updatedAt || "";
-  const updatedAt = generalLastup ? toIsoDateOrNow(generalLastup) : values.updatedAt || new Date().toISOString();
+  const latestUpdatedAt = values.latestUpdatedAt || (generalLastup ? toIsoDateOrNow(generalLastup) : "");
+  const updatedAt = values.updatedAt || latestUpdatedAt || new Date().toISOString();
+  const checkMode = ncode ? CHECK_MODE_API : CHECK_MODE_MANUAL;
+  const status = values.status || deriveNovelStatus({ ...values, checkMode, latestChapter, lastReadChapter: readChapter, readChapter });
 
   return {
     id: createId(),
@@ -380,19 +409,24 @@ function createNovel(values) {
     url: values.url || "",
     generalLastup,
     generalAllNo: latestChapter,
+    latestChapter,
+    latestUpdatedAt,
     lastReadEpisode: readChapter,
+    lastReadChapter: readChapter,
     lastReadEpisodeId: values.lastReadEpisodeId || "",
     sourceUrl: values.sourceUrl || "",
     lastCheckedAt: values.lastCheckedAt || "",
-    latestChapter,
     readChapter,
     latest: formatChapter(latestChapter),
     position: formatChapter(readChapter),
     lastOpenedChapter: toChapterNumber(values.lastOpenedChapter),
     lastViewedAt: values.lastViewedAt || "",
-    memo: values.memo || "",
+    memo: values.memo || values.note || "",
+    note: values.note || values.memo || "",
     favorite: Boolean(values.favorite),
-    unread: Boolean(values.unread),
+    checkMode,
+    status,
+    unread: status === STATUS_UNREAD,
     lastCheckDiff: toChapterNumber(values.lastCheckDiff),
     updateCheckStatus: values.updateCheckStatus || "",
     updateCheckNote: values.updateCheckNote || "",
@@ -539,7 +573,7 @@ function showForm(novel = null, options = {}) {
   setSelectValue(elements.novelSite, novel?.site || DEFAULT_SITE);
   elements.novelUrl.value = novel?.url || "";
   elements.novelLatest.value = novel?.generalAllNo || novel?.latestChapter || "";
-  elements.novelPosition.value = novel?.lastReadEpisode || novel?.readChapter || "";
+  elements.novelPosition.value = novel?.lastReadChapter || novel?.lastReadEpisode || novel?.readChapter || "";
   elements.novelMemo.value = novel?.memo || "";
   elements.novelTitle.focus();
 }
@@ -586,7 +620,9 @@ function getNovelFormValue() {
     generalAllNo: latestChapter,
     latestChapter,
     lastReadEpisode: readChapter,
+    lastReadChapter: readChapter,
     readChapter,
+    checkMode: (sourceInfo.site === "narou" || extractNarouNcode(url)) ? CHECK_MODE_API : CHECK_MODE_MANUAL,
     memo: elements.novelMemo.value.trim(),
   };
 }
@@ -604,9 +640,11 @@ function upsertNovel(formValue, id) {
       ...formValue,
       generalAllNo: formValue.generalAllNo,
       lastReadEpisode: formValue.lastReadEpisode,
+      lastReadChapter: formValue.lastReadChapter,
       latest: formatChapter(formValue.latestChapter),
       position: formatChapter(formValue.readChapter),
-      unread: hasUnreadChapters(formValue),
+      status: deriveNovelStatus(formValue),
+      unread: deriveNovelStatus(formValue) === STATUS_UNREAD,
       lastCheckDiff: 0,
       updatedAt: new Date().toISOString(),
     };
@@ -614,7 +652,7 @@ function upsertNovel(formValue, id) {
 }
 
 function hasUnreadChapters(novel) {
-  return toChapterNumber(novel.generalAllNo ?? novel.latestChapter) > toChapterNumber(novel.lastReadEpisode ?? novel.readChapter);
+  return toChapterNumber(novel.generalAllNo ?? novel.latestChapter) > toChapterNumber(novel.lastReadChapter ?? novel.lastReadEpisode ?? novel.readChapter);
 }
 
 function findDuplicateNovel(target, ignoreId = "") {
@@ -735,10 +773,23 @@ function sanitizeNovel(novel) {
   // Older exports used Japanese strings like "第12話"; normalize both shapes.
   const sourceInfo = extractSourceInfoFromUrl(novel.url);
   const latestChapter = toChapterNumber(novel.generalAllNo ?? novel.latestChapter ?? novel.latest);
-  const readChapter = toChapterNumber(novel.lastReadEpisode ?? novel.readChapter ?? novel.position);
-  const ncode = normalizeNcode(novel.ncode || (sourceInfo.site === "narou" ? sourceInfo.workId : "")) || extractNarouNcode(novel.url);
+  const readChapter = toChapterNumber(novel.lastReadChapter ?? novel.lastReadEpisode ?? novel.readChapter ?? novel.position);
+  const ncode = sourceInfo.site === "nocturne"
+    ? ""
+    : normalizeNcode(novel.ncode || (sourceInfo.site === "narou" ? sourceInfo.workId : "")) || extractNarouNcode(novel.url);
   const generalLastup = novel.generalLastup || novel.lastup || novel.updatedAt || "";
   const site = ncode ? DEFAULT_SITE : novel.site || OTHER_SITE;
+  const latestUpdatedAt = novel.latestUpdatedAt || (generalLastup ? toIsoDateOrNow(generalLastup) : "");
+  const checkMode = ncode ? CHECK_MODE_API : CHECK_MODE_MANUAL;
+  const status = deriveNovelStatus({
+    ...novel,
+    checkMode,
+    latestChapter,
+    generalAllNo: latestChapter,
+    lastReadChapter: readChapter,
+    lastReadEpisode: readChapter,
+    readChapter,
+  });
 
   return {
     id: novel.id || createId(),
@@ -754,23 +805,28 @@ function sanitizeNovel(novel) {
     url: String(novel.url || "").trim(),
     generalLastup,
     generalAllNo: latestChapter,
+    latestChapter,
+    latestUpdatedAt,
     lastReadEpisode: readChapter,
+    lastReadChapter: readChapter,
     lastReadEpisodeId: novel.lastReadEpisodeId || "",
     sourceUrl: novel.sourceUrl || "",
     lastCheckedAt: novel.lastCheckedAt || "",
-    latestChapter,
     readChapter,
     latest: formatChapter(latestChapter),
     position: formatChapter(readChapter),
     lastOpenedChapter: toChapterNumber(novel.lastOpenedChapter),
     lastViewedAt: novel.lastViewedAt || "",
-    memo: String(novel.memo || "").trim(),
+    memo: String(novel.memo || novel.note || "").trim(),
+    note: String(novel.note || novel.memo || "").trim(),
     favorite: Boolean(novel.favorite),
-    unread: Boolean(novel.unread) || hasUnreadChapters({ latestChapter, readChapter }),
+    checkMode,
+    status,
+    unread: status === STATUS_UNREAD,
     lastCheckDiff: toChapterNumber(novel.lastCheckDiff),
     updateCheckStatus: novel.updateCheckStatus || "",
     updateCheckNote: String(novel.updateCheckNote || "").trim(),
-    updatedAt: generalLastup ? toIsoDateOrNow(generalLastup) : novel.updatedAt || new Date().toISOString(),
+    updatedAt: novel.updatedAt || latestUpdatedAt || new Date().toISOString(),
   };
 }
 
@@ -843,11 +899,11 @@ function getRegisteredTimestamp(novel) {
 }
 
 function hasUnreadState(novel) {
-  return getUnreadChapterCount(novel) > 0 || Boolean(novel.unread);
+  return deriveNovelStatus(novel) === STATUS_UNREAD;
 }
 
 function hasUpdateState(novel) {
-  return Boolean(novel.unread || novel.lastCheckDiff || novel.updateCheckStatus === "ok" && getUnreadChapterCount(novel) > 0);
+  return deriveNovelStatus(novel) === STATUS_UNREAD || Boolean(novel.lastCheckDiff);
 }
 
 function render() {
@@ -882,6 +938,8 @@ function processBookmarkletParams() {
     episodeId: params.get("episodeId") || "",
     episodeNo: toChapterNumber(params.get("episodeNo")),
     sourceUrl: params.get("sourceUrl") || "",
+    pageTitle: params.get("pageTitle") || "",
+    readAt: params.get("readAt") || new Date().toISOString(),
   };
 
   const result = applyBookmarkletRead(payload);
@@ -893,7 +951,7 @@ function processBookmarkletParams() {
 
 function applyBookmarkletRead(payload) {
   if (!isSupportedBookmarkletPayload(payload)) {
-    return { ok: false, message: "このページは読了登録に対応していません。" };
+    return { ok: false, message: "話数を推定できませんでした。作品を編集して読了話数を手入力してください。" };
   }
 
   const novel = findNovelByBookmarkletPayload(payload);
@@ -907,9 +965,9 @@ function applyBookmarkletRead(payload) {
 
 function isSupportedBookmarkletPayload(payload) {
   if (["narou", "nocturne"].includes(payload.site)) return Boolean(normalizeNcode(payload.workId || payload.ncode) && payload.episodeNo);
-  if (["kakuyomu", "akatsuki", "pixiv", "novelup"].includes(payload.site)) return Boolean(payload.workId && payload.episodeId);
+  if (["kakuyomu", "akatsuki", "pixiv", "novelup"].includes(payload.site)) return Boolean(payload.workId && payload.episodeNo);
   if (payload.site === "hameln") return Boolean((payload.novelId || payload.workId) && payload.episodeNo);
-  if (payload.site === "arcadia") return Boolean(payload.workId && payload.sourceUrl.includes("n="));
+  if (payload.site === "arcadia") return Boolean(payload.workId && payload.episodeNo);
   return false;
 }
 
@@ -941,33 +999,29 @@ function findExternalNovelBySiteAndWork(site, workId, urlNeedle) {
 }
 
 function updateNovelReadFromBookmarklet(targetNovel, payload) {
-  const now = new Date().toISOString();
+  const now = payload.readAt || new Date().toISOString();
   state.novels = state.novels.map((novel) => {
     if (novel.id !== targetNovel.id) return novel;
 
-    if (payload.episodeId && !payload.episodeNo) {
-      return {
-        ...novel,
-        workId: payload.workId,
-        lastReadEpisodeId: payload.episodeId,
-        episodeId: payload.episodeId,
-        sourceUrl: payload.sourceUrl,
-        lastViewedAt: now,
-      };
-    }
-
-    const readChapter = Math.max(toChapterNumber(novel.lastReadEpisode ?? novel.readChapter), payload.episodeNo);
+    const readChapter = Math.max(toChapterNumber(novel.lastReadChapter ?? novel.lastReadEpisode ?? novel.readChapter), payload.episodeNo);
+    const status = isManualManagedNovel(novel)
+      ? STATUS_MANUAL
+      : ((novel.generalAllNo || novel.latestChapter || 0) > readChapter ? STATUS_UNREAD : STATUS_UP_TO_DATE);
     return {
       ...novel,
       workId: payload.workId || novel.workId,
       novelId: payload.novelId || novel.novelId,
+      title: novel.title || payload.pageTitle,
       lastReadEpisode: readChapter,
+      lastReadChapter: readChapter,
       readChapter,
       position: formatChapter(readChapter),
       lastOpenedChapter: payload.episodeNo,
       sourceUrl: payload.sourceUrl,
       lastViewedAt: now,
-      unread: (novel.generalAllNo || novel.latestChapter || 0) > readChapter,
+      updatedAt: now,
+      status,
+      unread: status === STATUS_UNREAD,
       lastCheckDiff: (novel.generalAllNo || novel.latestChapter || 0) > readChapter ? novel.lastCheckDiff : 0,
     };
   });
@@ -1039,11 +1093,13 @@ function createBookmarkletHref() {
       ];
       const matched = patterns.find((item) => item.match);
       if (!matched) {
-        location.href = ${JSON.stringify(targetUrl.href)} + "?site=unsupported&sourceUrl=" + encodeURIComponent(sourceUrl);
+        location.href = ${JSON.stringify(targetUrl.href)} + "?site=unsupported&sourceUrl=" + encodeURIComponent(sourceUrl) + "&pageTitle=" + encodeURIComponent(document.title || "") + "&readAt=" + encodeURIComponent(new Date().toISOString());
         return;
       }
       const payload = matched.build(matched.match);
       payload.sourceUrl = sourceUrl;
+      payload.pageTitle = document.title || "";
+      payload.readAt = new Date().toISOString();
       const params = new URLSearchParams(payload);
       location.href = ${JSON.stringify(targetUrl.href)} + "?" + params.toString();
     })();
@@ -1201,6 +1257,9 @@ function normalizeNarouNovel(item) {
     generalLastup,
     generalAllNo,
     latestChapter: generalAllNo,
+    latestUpdatedAt: generalLastup ? toIsoDateOrNow(generalLastup) : "",
+    checkMode: CHECK_MODE_API,
+    status: generalAllNo > 0 ? STATUS_UNREAD : STATUS_UP_TO_DATE,
     story: item.story || "",
     genre: item.genre || "",
     keyword: item.keyword || "",
@@ -1315,6 +1374,8 @@ function createNovelFromNarouItem(item) {
     generalLastup: item.generalLastup || item.lastup,
     generalAllNo: item.generalAllNo ?? item.latestChapter,
     lastReadEpisode: 0,
+    lastReadChapter: 0,
+    checkMode: CHECK_MODE_API,
     memo: `作者：${item.author || item.writer}\n${item.story}`,
     unread: toChapterNumber(item.generalAllNo ?? item.latestChapter) > 0,
   });
@@ -1348,7 +1409,9 @@ async function registerNovelFromUrl() {
     url,
     latestChapter: 0,
     readChapter: 0,
-    memo: site === DEFAULT_SITE ? "API取得に失敗しました。タイトルを入力して保存してください。" : "API未対応サイトの外部リンク管理です。",
+    checkMode: ncode ? CHECK_MODE_API : CHECK_MODE_MANUAL,
+    status: ncode ? STATUS_FAILED : STATUS_MANUAL,
+    memo: site === DEFAULT_SITE ? "API取得に失敗しました。タイトルを入力して保存してください。" : "API非対応サイトです。更新は手動で確認してください。",
   }, { urlRegister: true });
   setFormError("タイトルだけ入力して保存できます。サイト種別はURLから判定しました。");
 }
@@ -1393,7 +1456,7 @@ function renderBookmarkletStatus() {
 }
 
 function renderUpdates() {
-  const updates = getUpdatedNovels();
+  const updates = getUpdateTabNovels();
   renderUpdateCheckStatus();
   elements.checkUpdates.disabled = state.updateChecking;
   elements.checkUpdates.textContent = state.updateChecking ? "確認中..." : "更新確認";
@@ -1413,9 +1476,16 @@ function renderUpdateCheckStatus() {
 }
 
 async function checkNarouUpdates() {
-  const targets = state.novels.filter(isNarouNovelWithNcode);
+  const apiTargets = state.novels.filter(isNarouNovelWithNcode);
+  const now = Date.now();
+  const targets = apiTargets.filter((novel) => {
+    const lastChecked = getTimestamp(novel.lastCheckedAt);
+    return !lastChecked || now - lastChecked >= NAROU_CHECK_INTERVAL_MS;
+  });
   if (targets.length === 0) {
-    state.updateCheckError = "Nコードを持つ小説家になろう作品が本棚にありません。なろう検索から追加するか、なろう作品URLを登録してください。";
+    state.updateCheckError = apiTargets.length
+      ? "短時間の連続確認を避けるため、前回確認から少し時間を置いてください。"
+      : "API対応の小説家になろう作品が本棚にありません。なろう検索から追加するか、なろう作品URLを登録してください。";
     state.updateCheckMessage = "";
     renderUpdates();
     return;
@@ -1435,12 +1505,14 @@ async function checkNarouUpdates() {
 
     state.novels = state.novels.map((novel) => {
       if (!isNarouNovelWithNcode(novel)) return novel;
+      if (!targets.some((target) => target.id === novel.id)) return novel;
       const latestItem = latestByNcode.get(novel.ncode);
       if (!latestItem) {
         missingCount += 1;
         return {
           ...novel,
           lastCheckedAt: checkedAt,
+          status: STATUS_FAILED,
           updateCheckStatus: "error",
           updateCheckNote: "API取得なし",
         };
@@ -1460,8 +1532,8 @@ async function checkNarouUpdates() {
     state.updateCheckError = "更新確認に失敗しました。なろうAPIの混雑、通信制限、またはJSONP読み込み失敗の可能性があります。";
     state.updateCheckMessage = "";
     state.novels = state.novels.map((novel) => (
-      isNarouNovelWithNcode(novel)
-        ? { ...novel, updateCheckStatus: "error", updateCheckNote: "更新確認失敗" }
+      targets.some((target) => target.id === novel.id)
+        ? { ...novel, status: STATUS_FAILED, updateCheckStatus: "error", updateCheckNote: "更新確認失敗", lastCheckedAt: new Date().toISOString() }
         : novel
     ));
     saveState();
@@ -1472,11 +1544,11 @@ async function checkNarouUpdates() {
 }
 
 function isNarouNovelWithNcode(novel) {
-  return Boolean(novel.ncode);
+  return isApiManagedNovel(novel);
 }
 
 function isExternalManagedNovel(novel) {
-  return !isNarouNovelWithNcode(novel);
+  return isManualManagedNovel(novel);
 }
 
 function createNarouUpdatePatch(novel, latestItem, checkedAt) {
@@ -1489,7 +1561,8 @@ function createNarouUpdatePatch(novel, latestItem, checkedAt) {
   const latestUpdatedAt = getTimestamp(latestUpdatedIso);
   const chapterDiff = Math.max(0, latestChapter - previousChapter);
   const hasUpdate = chapterDiff > 0 || latestLastup !== previousLastup || latestUpdatedAt > previousUpdatedAt;
-  const unread = hasUpdate || latestChapter > toChapterNumber(novel.lastReadEpisode ?? novel.readChapter) || novel.unread;
+  const lastReadChapter = toChapterNumber(novel.lastReadChapter ?? novel.lastReadEpisode ?? novel.readChapter);
+  const status = latestChapter > lastReadChapter ? STATUS_UNREAD : STATUS_UP_TO_DATE;
 
   return {
     hasUpdate,
@@ -1502,9 +1575,13 @@ function createNarouUpdatePatch(novel, latestItem, checkedAt) {
     generalLastup: latestLastup || previousLastup,
     generalAllNo: latestChapter,
     latestChapter,
+    latestUpdatedAt: latestUpdatedIso,
+    lastReadChapter,
     latest: formatChapter(latestChapter),
     updatedAt: latestUpdatedIso,
-    unread,
+    checkMode: CHECK_MODE_API,
+    status,
+    unread: status === STATUS_UNREAD,
     lastCheckDiff: chapterDiff,
     lastCheckedAt: checkedAt,
     updateCheckStatus: "ok",
@@ -1515,8 +1592,26 @@ function createNarouUpdatePatch(novel, latestItem, checkedAt) {
 function getUpdatedNovels() {
   const orderIndex = new Map(state.updateOrder.map((id, index) => [id, index]));
   return state.novels
-    .filter((novel) => novel.unread)
+    .filter((novel) => deriveNovelStatus(novel) === STATUS_UNREAD)
     .sort((a, b) => compareByUpdatePriority(a, b, orderIndex));
+}
+
+function getUpdateTabNovels() {
+  const orderIndex = new Map(state.updateOrder.map((id, index) => [id, index]));
+  return [...state.novels].sort((a, b) => {
+    const aStatus = deriveNovelStatus(a);
+    const bStatus = deriveNovelStatus(b);
+    const order = {
+      [STATUS_UNREAD]: 0,
+      [STATUS_FAILED]: 1,
+      [STATUS_MANUAL]: 2,
+      [STATUS_UP_TO_DATE]: 3,
+    };
+    const priority = order[aStatus] - order[bStatus];
+    if (priority !== 0) return priority;
+    if (aStatus === STATUS_UNREAD) return compareByUpdatePriority(a, b, orderIndex);
+    return compareByUpdateDate(a, b);
+  });
 }
 
 function compareByUpdatePriority(a, b, orderIndex) {
@@ -1536,10 +1631,15 @@ function getTimestamp(value) {
 }
 
 function renderUpdatesSummary(updates) {
-  const totalDiff = updates.reduce((sum, novel) => sum + getUnreadChapterCount(novel), 0);
+  const unreadItems = updates.filter((novel) => deriveNovelStatus(novel) === STATUS_UNREAD);
+  const failedItems = updates.filter((novel) => deriveNovelStatus(novel) === STATUS_FAILED);
+  const manualItems = updates.filter((novel) => deriveNovelStatus(novel) === STATUS_MANUAL);
+  const totalDiff = unreadItems.reduce((sum, novel) => sum + getUnreadChapterCount(novel), 0);
   return `
-    <span class="badge unread">NEW ${updates.length}件</span>
+    <span class="badge unread">未読あり ${unreadItems.length}件</span>
     <span class="badge">未読: ${totalDiff}話</span>
+    <span class="badge">手動管理 ${manualItems.length}件</span>
+    ${failedItems.length ? `<span class="badge is-warning">確認失敗 ${failedItems.length}件</span>` : ""}
     <span class="muted">ドラッグで優先順を変更できます</span>
   `;
 }
@@ -1549,34 +1649,45 @@ function renderUpdateCard(novel) {
   const nextChapter = getNextReadableChapter(novel);
   const diffText = getUpdateDiffText(novel, unreadCount);
   const checkDiffText = novel.lastCheckDiff ? `API差分 +${novel.lastCheckDiff}話` : "";
+  const status = deriveNovelStatus(novel);
   const continueButton = novel.url
     ? renderContinueLink(novel)
     : "";
+  const statusLabel = {
+    [STATUS_UNREAD]: "未読あり",
+    [STATUS_UP_TO_DATE]: "最新まで読了",
+    [STATUS_FAILED]: "確認失敗",
+    [STATUS_MANUAL]: "手動管理",
+  }[status] || "手動管理";
+  const statusClass = status === STATUS_UNREAD ? "new-label" : `badge${status === STATUS_FAILED ? " is-warning" : ""}`;
+  const manualNotice = status === STATUS_MANUAL ? '<p class="update-diff">更新は手動で確認してください。</p>' : "";
 
   return `
     <article class="update-card" data-id="${novel.id}">
       <button class="drag-handle" type="button" aria-label="${escapeHtml(`${novel.title}を並び替える`)}">⋮⋮</button>
       <div class="update-main">
         <div class="update-title-row">
-          <span class="new-label">NEW</span>
+          <span class="${statusClass}">${escapeHtml(statusLabel)}</span>
           <div>
             <h3 class="novel-title">${escapeHtml(novel.title)}</h3>
-            <p class="update-time">最終更新：${escapeHtml(formatUpdatedAt(novel.generalLastup || novel.updatedAt))}</p>
+            <p class="update-time">最終更新：${escapeHtml(formatUpdatedAt(novel.latestUpdatedAt || novel.generalLastup || novel.updatedAt))}</p>
           </div>
         </div>
         <div class="meta-row">
           <span class="badge">${escapeHtml(novel.site)}</span>
+          <span class="badge">${isApiManagedNovel(novel) ? "API対応" : "手動管理"}</span>
           ${novel.generalAllNo ? `<span class="badge">更新 ${novel.generalAllNo}話</span>` : ""}
           ${unreadCount ? `<span class="badge unread">未読: ${unreadCount}話</span>` : ""}
           ${checkDiffText ? `<span class="badge unread">${escapeHtml(checkDiffText)}</span>` : ""}
           <span class="badge">次 ${nextChapter}話</span>
         </div>
         <p class="update-diff">${escapeHtml(diffText)}</p>
+        ${manualNotice}
         ${novel.lastViewedAt ? `<p class="update-time">最終閲覧：${escapeHtml(formatUpdatedAt(novel.lastViewedAt))}</p>` : ""}
       </div>
       <div class="card-actions update-actions">
         ${continueButton}
-        <button class="text-button" type="button" data-action="read" aria-label="${escapeHtml(`${novel.title}を既読にする`)}">既読</button>
+        <button class="text-button" type="button" data-action="read" aria-label="${escapeHtml(`${novel.title}を最新まで読了にする`)}">最新まで読了</button>
         <button class="text-button" type="button" data-action="edit" aria-label="${escapeHtml(`${novel.title}を編集する`)}">編集</button>
       </div>
     </article>
@@ -1616,7 +1727,7 @@ function saveUpdateOrderFromDom() {
 
 function getUpdateDiffText(novel, unreadCount) {
   const latestEpisode = toChapterNumber(novel.generalAllNo ?? novel.latestChapter);
-  const lastReadEpisode = toChapterNumber(novel.lastReadEpisode ?? novel.readChapter);
+  const lastReadEpisode = toChapterNumber(novel.lastReadChapter ?? novel.lastReadEpisode ?? novel.readChapter);
   if (!latestEpisode) return "更新話数は未設定です";
   if (unreadCount > 0) return `${lastReadEpisode}話から${latestEpisode}話まで、${unreadCount}話分の更新があります`;
   return `${latestEpisode}話まで確認済みです`;
@@ -1629,7 +1740,7 @@ function renderNovelCard(novel) {
   const unreadCount = getUnreadChapterCount(novel);
   const viewedText = getViewedText(novel);
   const latestEpisode = toChapterNumber(novel.generalAllNo ?? novel.latestChapter);
-  const lastReadEpisode = toChapterNumber(novel.lastReadEpisode ?? novel.readChapter);
+  const lastReadEpisode = toChapterNumber(novel.lastReadChapter ?? novel.lastReadEpisode ?? novel.readChapter);
   const sourceUrl = novel.url || SITE_HOME_URLS[novel.site] || "";
 
   return `
@@ -1681,8 +1792,8 @@ function renderNovelCard(novel) {
       ${novel.memo ? `<p class="novel-memo">${escapeHtml(novel.memo)}</p>` : ""}
       <div class="card-actions">
         ${urlButton}
-        ${novel.ncode ? `<button class="text-button" type="button" data-action="reader" aria-label="${escapeHtml(`${novel.title}の話一覧を開く`)}">話一覧</button>` : ""}
-        <button class="text-button" type="button" data-action="read" aria-label="${escapeHtml(`${novel.title}を既読にする`)}">既読</button>
+        ${isApiManagedNovel(novel) ? `<button class="text-button" type="button" data-action="reader" aria-label="${escapeHtml(`${novel.title}の話数リストを開く`)}">話数リスト</button>` : ""}
+        <button class="text-button" type="button" data-action="read" aria-label="${escapeHtml(`${novel.title}を最新まで読了にする`)}">最新まで読了</button>
         <button class="text-button" type="button" data-action="edit" aria-label="${escapeHtml(`${novel.title}を編集する`)}">編集</button>
         <button class="text-button" type="button" data-action="delete" aria-label="${escapeHtml(`${novel.title}を削除する`)}">削除</button>
       </div>
@@ -1692,26 +1803,21 @@ function renderNovelCard(novel) {
 
 function renderNovelStatusLabels(novel, unreadCount) {
   const labels = [];
-  if (unreadCount > 0 || novel.unread) {
+  const status = deriveNovelStatus(novel);
+  if (status === STATUS_UNREAD) {
     labels.push('<span class="badge unread">未読あり</span>');
-  } else {
+  } else if (status === STATUS_UP_TO_DATE) {
     labels.push('<span class="badge is-complete">読了済み</span>');
+  } else if (status === STATUS_FAILED) {
+    labels.push('<span class="badge is-warning">確認失敗</span>');
+  } else {
+    labels.push('<span class="badge">手動管理</span>');
   }
 
-  if (hasUpdateState(novel)) {
-    labels.push('<span class="badge unread">更新あり</span>');
-  }
+  labels.push(isApiManagedNovel(novel) ? '<span class="badge">API対応</span>' : '<span class="badge">更新確認未対応</span>');
 
   if (novel.favorite) {
     labels.push('<span class="badge is-favorite">お気に入り</span>');
-  }
-
-  if (isExternalManagedNovel(novel)) {
-    labels.push('<span class="badge">更新確認未対応</span>');
-  }
-
-  if (novel.updateCheckStatus === "error") {
-    labels.push('<span class="badge is-warning">更新確認エラー</span>');
   }
 
   if (novel.lastCheckDiff) {
@@ -1846,25 +1952,28 @@ function bindReaderActions() {
 function markEpisodeRead(episode) {
   const novel = state.novels.find((item) => item.id === state.readerNovelId);
   if (!novel || !episode) return;
-  const readChapter = Math.max(toChapterNumber(novel.lastReadEpisode ?? novel.readChapter), episode);
+  const readChapter = Math.max(toChapterNumber(novel.lastReadChapter ?? novel.lastReadEpisode ?? novel.readChapter), episode);
   updateNovel(novel.id, {
     lastReadEpisode: readChapter,
+    lastReadChapter: readChapter,
     readChapter,
     position: formatChapter(readChapter),
     lastOpenedChapter: episode,
     lastViewedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    status: (novel.generalAllNo || novel.latestChapter || 0) > readChapter ? STATUS_UNREAD : deriveNovelStatus({ ...novel, lastReadChapter: readChapter, readChapter }),
     unread: (novel.generalAllNo || novel.latestChapter || 0) > readChapter,
     lastCheckDiff: (novel.generalAllNo || novel.latestChapter || 0) > readChapter ? novel.lastCheckDiff : 0,
   });
 }
 
 function getUnreadChapterCount(novel) {
-  return Math.max(0, Number(novel.generalAllNo ?? novel.latestChapter ?? 0) - Number(novel.lastReadEpisode ?? novel.readChapter ?? 0));
+  return Math.max(0, Number(novel.generalAllNo ?? novel.latestChapter ?? 0) - Number(novel.lastReadChapter ?? novel.lastReadEpisode ?? novel.readChapter ?? 0));
 }
 
 function getProgressText(novel, unreadCount) {
   const latestEpisode = toChapterNumber(novel.generalAllNo ?? novel.latestChapter);
-  const lastReadEpisode = toChapterNumber(novel.lastReadEpisode ?? novel.readChapter);
+  const lastReadEpisode = toChapterNumber(novel.lastReadChapter ?? novel.lastReadEpisode ?? novel.readChapter);
   if (!latestEpisode && !lastReadEpisode) return isExternalManagedNovel(novel) ? "API未対応サイトのため、更新は外部リンクで確認します" : "";
   if (unreadCount > 0) return `未読: ${unreadCount}話（${lastReadEpisode}話 → ${latestEpisode}話）`;
   if (lastReadEpisode > 0) return `最新話まで読了済み（${lastReadEpisode}話）`;
@@ -1938,13 +2047,13 @@ function deleteNovel(novel) {
 
 function getNextReadableChapter(novel) {
   const latestChapter = novel.generalAllNo || novel.latestChapter || 0;
-  const readChapter = novel.lastReadEpisode || novel.readChapter || 0;
+  const readChapter = novel.lastReadChapter || novel.lastReadEpisode || novel.readChapter || 0;
   if (!latestChapter) return readChapter || 1;
   return Math.min(latestChapter, readChapter + 1 || 1);
 }
 
 function getContinueUrl(novel, chapter) {
-  if (novel.ncode && novel.site === DEFAULT_SITE) {
+  if (isApiManagedNovel(novel)) {
     return `https://ncode.syosetu.com/${novel.ncode.toLowerCase()}/${chapter}/`;
   }
   return novel.url || SITE_HOME_URLS[novel.site] || "#";
@@ -1954,19 +2063,26 @@ function markNovelRead(novel) {
   const readChapter = getReadableLatestChapter(novel);
   updateNovel(novel.id, {
     lastReadEpisode: readChapter,
+    lastReadChapter: readChapter,
     readChapter,
     position: formatChapter(readChapter),
+    updatedAt: new Date().toISOString(),
+    status: isManualManagedNovel(novel) ? STATUS_MANUAL : STATUS_UP_TO_DATE,
     unread: false,
     lastCheckDiff: 0,
   });
 }
 
 function getReadableLatestChapter(novel) {
-  return Math.max(novel.lastReadEpisode || novel.readChapter || 0, novel.generalAllNo || novel.latestChapter || 0);
+  return Math.max(novel.lastReadChapter || novel.lastReadEpisode || novel.readChapter || 0, novel.generalAllNo || novel.latestChapter || 0);
 }
 
 function updateNovel(id, patch) {
-  state.novels = state.novels.map((novel) => (novel.id === id ? { ...novel, ...patch } : novel));
+  state.novels = state.novels.map((novel) => {
+    if (novel.id !== id) return novel;
+    const next = { ...novel, ...patch };
+    return { ...next, status: patch.status || deriveNovelStatus(next), unread: patch.unread ?? deriveNovelStatus(next) === STATUS_UNREAD };
+  });
   saveState();
   render();
 }
@@ -1977,8 +2093,11 @@ function markAllRead() {
     return {
       ...novel,
       lastReadEpisode: readChapter,
+      lastReadChapter: readChapter,
       readChapter,
       position: formatChapter(readChapter),
+      updatedAt: new Date().toISOString(),
+      status: isManualManagedNovel(novel) ? STATUS_MANUAL : STATUS_UP_TO_DATE,
       unread: false,
       lastCheckDiff: 0,
     };
@@ -2056,7 +2175,7 @@ function renderRankingItem(novel, index) {
 }
 
 function exportData() {
-  elements.exportBox.value = JSON.stringify({ version: 1, novels: state.novels }, null, 2);
+  elements.exportBox.value = JSON.stringify({ version: 1, storageKey: STORAGE_KEY, novels: state.novels, updateOrder: state.updateOrder }, null, 2);
   elements.exportBox.select();
 }
 
@@ -2070,6 +2189,7 @@ function importData(event) {
       const parsed = JSON.parse(reader.result);
       const imported = parseImportedNovels(parsed);
       state.novels = dedupeNovels([...state.novels, ...imported]);
+      state.updateOrder = normalizeUpdateOrder(parsed?.updateOrder || state.updateOrder);
       saveState();
       render();
     } catch {
