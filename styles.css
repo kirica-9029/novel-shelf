@@ -382,6 +382,10 @@ textarea {
   margin-bottom: 14px;
 }
 
+.toolbar label {
+  min-width: 0;
+}
+
 .catalog-search {
   position: sticky;
   top: 58px;
@@ -785,6 +789,12 @@ textarea {
   font-weight: 700;
 }
 
+.badge.is-favorite {
+  background: color-mix(in srgb, #d6a600, var(--surface-soft) 70%);
+  color: #5a4300;
+  font-weight: 700;
+}
+
 .badge.is-warning {
   background: color-mix(in srgb, var(--danger), transparent 86%);
   color: var(--danger);
@@ -796,6 +806,25 @@ textarea {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 8px;
+}
+
+.favorite-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+.favorite-button.is-active {
+  border-color: color-mix(in srgb, #d6a600, var(--line) 35%);
+  background: color-mix(in srgb, #d6a600, var(--surface) 76%);
+  color: #5a4300;
 }
 
 .novel-progress-grid {
@@ -1255,6 +1284,10 @@ textarea {
     align-items: end;
   }
 
+  .toolbar {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
   .catalog-card {
     grid-template-columns: 1fr auto;
     align-items: center;
@@ -1288,5 +1321,9 @@ textarea {
 
   .search-box {
     grid-column: span 2;
+  }
+
+  .toolbar .search-box {
+    grid-column: auto;
   }
 }

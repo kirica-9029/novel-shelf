@@ -62,6 +62,8 @@ const state = {
   catalogHasSearched: false,
   librarySearch: "",
   siteFilter: "all",
+  libraryStatusFilter: "all",
+  librarySort: "updated",
   rankingSite: "all",
   rankingSort: "updated",
   rankingSearch: "",
@@ -123,8 +125,11 @@ function cacheElements() {
     formError: document.querySelector("#formError"),
     librarySearch: document.querySelector("#librarySearch"),
     siteFilter: document.querySelector("#siteFilter"),
+    libraryStatusFilter: document.querySelector("#libraryStatusFilter"),
+    librarySort: document.querySelector("#librarySort"),
     novelList: document.querySelector("#novelList"),
     libraryEmpty: document.querySelector("#libraryEmpty"),
+    libraryEmptyMessage: document.querySelector("#libraryEmptyMessage"),
     libraryEmptyRegister: document.querySelector("#libraryEmptyRegister"),
     libraryEmptySearch: document.querySelector("#libraryEmptySearch"),
     bookmarkletStatus: document.querySelector("#bookmarkletStatus"),
@@ -264,6 +269,14 @@ function bindLibraryEvents() {
     state.siteFilter = event.target.value;
     renderLibrary();
   });
+  elements.libraryStatusFilter.addEventListener("change", (event) => {
+    state.libraryStatusFilter = event.target.value;
+    renderLibrary();
+  });
+  elements.librarySort.addEventListener("change", (event) => {
+    state.librarySort = event.target.value;
+    renderLibrary();
+  });
 }
 
 function bindUpdateEvents() {
@@ -356,6 +369,7 @@ function createNovel(values) {
   return {
     id: createId(),
     title: values.title,
+    createdAt: values.createdAt || new Date().toISOString(),
     site,
     ncode,
     workId: values.workId || sourceInfo.workId || ncode,
@@ -377,6 +391,7 @@ function createNovel(values) {
     lastOpenedChapter: toChapterNumber(values.lastOpenedChapter),
     lastViewedAt: values.lastViewedAt || "",
     memo: values.memo || "",
+    favorite: Boolean(values.favorite),
     unread: Boolean(values.unread),
     lastCheckDiff: toChapterNumber(values.lastCheckDiff),
     updateCheckStatus: values.updateCheckStatus || "",
@@ -728,6 +743,7 @@ function sanitizeNovel(novel) {
   return {
     id: novel.id || createId(),
     title: String(novel.title || "").trim(),
+    createdAt: novel.createdAt || novel.addedAt || novel.created_at || novel.updatedAt || new Date().toISOString(),
     site,
     ncode,
     workId: novel.workId || sourceInfo.workId || ncode,
@@ -749,6 +765,7 @@ function sanitizeNovel(novel) {
     lastOpenedChapter: toChapterNumber(novel.lastOpenedChapter),
     lastViewedAt: novel.lastViewedAt || "",
     memo: String(novel.memo || "").trim(),
+    favorite: Boolean(novel.favorite),
     unread: Boolean(novel.unread) || hasUnreadChapters({ latestChapter, readChapter }),
     lastCheckDiff: toChapterNumber(novel.lastCheckDiff),
     updateCheckStatus: novel.updateCheckStatus || "",
@@ -791,11 +808,46 @@ function setSelectValue(select, value) {
 
 function getFilteredNovels() {
   const keyword = state.librarySearch.toLowerCase();
-  return state.novels.filter((novel) => {
-    const matchesSite = state.siteFilter === "all" || novel.site === state.siteFilter;
-    const text = `${novel.title} ${novel.site} ${novel.memo}`.toLowerCase();
-    return matchesSite && text.includes(keyword);
-  });
+  return state.novels
+    .filter((novel) => {
+      const matchesSite = state.siteFilter === "all" || novel.site === state.siteFilter;
+      const text = `${novel.title} ${novel.site} ${novel.author} ${novel.memo}`.toLowerCase();
+      return matchesSite && text.includes(keyword) && matchesLibraryStatusFilter(novel);
+    })
+    .sort(compareLibraryNovels);
+}
+
+function matchesLibraryStatusFilter(novel) {
+  if (state.libraryStatusFilter === "unread") return hasUnreadState(novel);
+  if (state.libraryStatusFilter === "updated") return hasUpdateState(novel);
+  if (state.libraryStatusFilter === "favorite") return Boolean(novel.favorite);
+  return true;
+}
+
+function compareLibraryNovels(a, b) {
+  if (state.librarySort === "title") {
+    return a.title.localeCompare(b.title, "ja");
+  }
+  if (state.librarySort === "registered") {
+    return getRegisteredTimestamp(b) - getRegisteredTimestamp(a);
+  }
+  return compareByUpdateDate(a, b);
+}
+
+function getRegisteredTimestamp(novel) {
+  const createdAt = getTimestamp(novel.createdAt);
+  if (createdAt) return createdAt;
+  const match = String(novel.id || "").match(/^novel-(\d+)/);
+  if (match) return Number(match[1]);
+  return getTimestamp(novel.updatedAt);
+}
+
+function hasUnreadState(novel) {
+  return getUnreadChapterCount(novel) > 0 || Boolean(novel.unread);
+}
+
+function hasUpdateState(novel) {
+  return Boolean(novel.unread || novel.lastCheckDiff || novel.updateCheckStatus === "ok" && getUnreadChapterCount(novel) > 0);
 }
 
 function render() {
@@ -1324,7 +1376,11 @@ function showCatalogMessage(message) {
 function renderLibrary() {
   const novels = getFilteredNovels();
   renderBookmarkletStatus();
+  const hasAnyNovels = state.novels.length > 0;
   elements.libraryEmpty.classList.toggle("is-hidden", novels.length > 0);
+  elements.libraryEmptyMessage.textContent = hasAnyNovels
+    ? "条件に合う作品がありません。検索語や絞り込み条件を変更してください。"
+    : "まだ作品がありません。まずは作品URLを貼り付けるか、小説家になろう検索から本棚に追加してください。";
   elements.novelList.innerHTML = novels.map(renderNovelCard).join("");
   bindCardActions(elements.novelList);
 }
@@ -1583,6 +1639,9 @@ function renderNovelCard(novel) {
           <h3 class="novel-title">${escapeHtml(novel.title)}</h3>
           <div class="status-row">${renderNovelStatusLabels(novel, unreadCount)}</div>
         </div>
+        <button class="favorite-button${novel.favorite ? " is-active" : ""}" type="button" data-action="favorite" aria-pressed="${novel.favorite ? "true" : "false"}" aria-label="${escapeHtml(`${novel.title}をお気に入り${novel.favorite ? "から外す" : "に追加する"}`)}">
+          <span aria-hidden="true">★</span>
+        </button>
       </div>
       <div class="novel-progress-grid" aria-label="${escapeHtml(`${novel.title}の読書状況`)}">
         ${renderNovelStat("更新話数", latestEpisode ? `${latestEpisode}話` : "未設定")}
@@ -1608,7 +1667,7 @@ function renderNovelCard(novel) {
         ` : ""}
         ${viewedText ? `
           <div>
-            <dt>読了情報</dt>
+            <dt>最終閲覧</dt>
             <dd>${escapeHtml(viewedText)}</dd>
           </div>
         ` : ""}
@@ -1637,6 +1696,14 @@ function renderNovelStatusLabels(novel, unreadCount) {
     labels.push('<span class="badge unread">未読あり</span>');
   } else {
     labels.push('<span class="badge is-complete">読了済み</span>');
+  }
+
+  if (hasUpdateState(novel)) {
+    labels.push('<span class="badge unread">更新あり</span>');
+  }
+
+  if (novel.favorite) {
+    labels.push('<span class="badge is-favorite">お気に入り</span>');
   }
 
   if (isExternalManagedNovel(novel)) {
@@ -1805,10 +1872,10 @@ function getProgressText(novel, unreadCount) {
 }
 
 function getViewedText(novel) {
-  if (!novel.lastViewedAt) return novel.lastReadEpisodeId ? `読了エピソードID：${novel.lastReadEpisodeId}` : "";
+  if (!novel.lastViewedAt) return novel.lastReadEpisodeId ? `閲覧日未記録 / 読了エピソードID：${novel.lastReadEpisodeId}` : "未閲覧";
   const chapter = novel.lastOpenedChapter ? ` / 最後に開いた話：${novel.lastOpenedChapter}話` : "";
   const episodeId = novel.lastReadEpisodeId ? ` / 読了エピソードID：${novel.lastReadEpisodeId}` : "";
-  return `最終閲覧：${formatUpdatedAt(novel.lastViewedAt)}${chapter}${episodeId}`;
+  return `${formatUpdatedAt(novel.lastViewedAt)}${chapter}${episodeId}`;
 }
 
 function formatUpdatedAt(value) {
@@ -1845,10 +1912,21 @@ function handleCardAction(button) {
     case "reader":
       openReader(novel);
       break;
+    case "favorite":
+      toggleFavoriteNovel(novel);
+      break;
     case "delete":
       deleteNovel(novel);
       break;
   }
+}
+
+function toggleFavoriteNovel(novel) {
+  state.novels = state.novels.map((item) => (
+    item.id === novel.id ? { ...item, favorite: !item.favorite } : item
+  ));
+  saveState();
+  render();
 }
 
 function deleteNovel(novel) {

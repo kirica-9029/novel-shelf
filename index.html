@@ -282,11 +282,31 @@
             本棚内検索
             <input id="librarySearch" type="search" placeholder="作品名・サイト・メモ" />
           </label>
-          <select id="siteFilter" aria-label="サイト絞り込み"></select>
+          <label>
+            サイト
+            <select id="siteFilter" aria-label="サイト別に絞り込み"></select>
+          </label>
+          <label>
+            状態
+            <select id="libraryStatusFilter" aria-label="状態で絞り込み">
+              <option value="all">すべて</option>
+              <option value="unread">未読あり</option>
+              <option value="updated">更新あり</option>
+              <option value="favorite">お気に入り</option>
+            </select>
+          </label>
+          <label>
+            並び替え
+            <select id="librarySort" aria-label="本棚の並び替え">
+              <option value="updated">更新日順</option>
+              <option value="registered">登録日順</option>
+              <option value="title">タイトル順</option>
+            </select>
+          </label>
         </div>
 
         <div class="empty-state is-hidden" id="libraryEmpty">
-          <p>まだ作品がありません。まずは作品URLを貼り付けるか、小説家になろう検索から本棚に追加してください。</p>
+          <p id="libraryEmptyMessage">まだ作品がありません。まずは作品URLを貼り付けるか、小説家になろう検索から本棚に追加してください。</p>
           <div class="empty-actions">
             <button class="primary-button" id="libraryEmptyRegister" type="button">作品URLを登録</button>
             <button class="ghost-button" id="libraryEmptySearch" type="button">小説家になろうで検索</button>
