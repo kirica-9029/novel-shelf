@@ -735,9 +735,14 @@ textarea {
   gap: 10px;
 }
 
+.novel-card-main {
+  min-width: 0;
+}
+
 .novel-title {
   margin: 0 0 6px;
   font-size: 1.04rem;
+  overflow-wrap: anywhere;
 }
 
 .meta-row {
@@ -773,6 +778,97 @@ textarea {
   background: color-mix(in srgb, var(--accent), transparent 78%);
   color: var(--accent-strong);
   font-weight: 700;
+}
+
+.badge.is-complete {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.badge.is-warning {
+  background: color-mix(in srgb, var(--danger), transparent 86%);
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.novel-progress-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.novel-stat {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.novel-stat span {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.novel-stat strong {
+  color: var(--text);
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.novel-stat.is-unread strong {
+  color: var(--accent-strong);
+}
+
+.novel-info-list {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0 0;
+}
+
+.novel-info-list div {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.novel-info-list dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.novel-info-list dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.novel-info-list a {
+  color: var(--accent-strong);
+}
+
+.novel-memo {
+  margin: 12px 0 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .update-card {
@@ -1103,6 +1199,17 @@ textarea {
 .tutorial-start {
   width: 100%;
   margin-top: 16px;
+}
+
+@media (max-width: 520px) {
+  .novel-progress-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .novel-info-list div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
 }
 
 @media (min-width: 720px) {

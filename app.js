@@ -378,6 +378,8 @@ function createNovel(values) {
     memo: values.memo || "",
     unread: Boolean(values.unread),
     lastCheckDiff: toChapterNumber(values.lastCheckDiff),
+    updateCheckStatus: values.updateCheckStatus || "",
+    updateCheckNote: values.updateCheckNote || "",
     updatedAt,
   };
 }
@@ -739,6 +741,8 @@ function sanitizeNovel(novel) {
     memo: String(novel.memo || "").trim(),
     unread: Boolean(novel.unread) || hasUnreadChapters({ latestChapter, readChapter }),
     lastCheckDiff: toChapterNumber(novel.lastCheckDiff),
+    updateCheckStatus: novel.updateCheckStatus || "",
+    updateCheckNote: String(novel.updateCheckNote || "").trim(),
     updatedAt: generalLastup ? toIsoDateOrNow(generalLastup) : novel.updatedAt || new Date().toISOString(),
   };
 }
@@ -1368,7 +1372,12 @@ async function checkNarouUpdates() {
       const latestItem = latestByNcode.get(novel.ncode);
       if (!latestItem) {
         missingCount += 1;
-        return { ...novel, lastCheckedAt: checkedAt };
+        return {
+          ...novel,
+          lastCheckedAt: checkedAt,
+          updateCheckStatus: "error",
+          updateCheckNote: "API取得なし",
+        };
       }
 
       const patch = createNarouUpdatePatch(novel, latestItem, checkedAt);
@@ -1384,6 +1393,12 @@ async function checkNarouUpdates() {
     console.warn("Narou update check failed", error);
     state.updateCheckError = "更新確認に失敗しました。なろうAPIの混雑、通信制限、またはJSONP読み込み失敗の可能性があります。";
     state.updateCheckMessage = "";
+    state.novels = state.novels.map((novel) => (
+      isNarouNovelWithNcode(novel)
+        ? { ...novel, updateCheckStatus: "error", updateCheckNote: "更新確認失敗" }
+        : novel
+    ));
+    saveState();
   } finally {
     state.updateChecking = false;
     render();
@@ -1426,6 +1441,8 @@ function createNarouUpdatePatch(novel, latestItem, checkedAt) {
     unread,
     lastCheckDiff: chapterDiff,
     lastCheckedAt: checkedAt,
+    updateCheckStatus: "ok",
+    updateCheckNote: "",
   };
 }
 
@@ -1544,33 +1561,55 @@ function renderNovelCard(novel) {
     ? renderContinueLink(novel)
     : "";
   const unreadCount = getUnreadChapterCount(novel);
-  const progressText = getProgressText(novel, unreadCount);
   const viewedText = getViewedText(novel);
+  const latestEpisode = toChapterNumber(novel.generalAllNo ?? novel.latestChapter);
+  const lastReadEpisode = toChapterNumber(novel.lastReadEpisode ?? novel.readChapter);
+  const sourceUrl = novel.url || SITE_HOME_URLS[novel.site] || "";
 
   return `
     <article class="novel-card" data-id="${novel.id}">
       <div class="card-top">
-        <div>
+        <div class="novel-card-main">
           <h3 class="novel-title">${escapeHtml(novel.title)}</h3>
-          <div class="meta-row">
-            <span class="badge">${escapeHtml(novel.site)}</span>
-            ${isExternalManagedNovel(novel) ? '<span class="badge">外部リンク管理</span>' : ""}
-            ${novel.unread ? '<span class="badge unread">更新あり</span>' : ""}
-            ${novel.unread ? '<span class="new-label">NEW</span>' : ""}
-            ${novel.generalAllNo ? `<span class="badge">更新 ${novel.generalAllNo}話</span>` : ""}
-            ${novel.ncode ? `<span class="badge">読了 ${novel.lastReadEpisode || 0} / 全 ${novel.generalAllNo || 0}話</span>` : ""}
-            ${unreadCount ? `<span class="badge unread">未読: ${unreadCount}話</span>` : ""}
-            ${novel.lastCheckDiff ? `<span class="badge unread">差分 +${novel.lastCheckDiff}話</span>` : ""}
-            ${!novel.ncode && novel.lastReadEpisode ? `<span class="badge">読了 ${novel.lastReadEpisode}話</span>` : ""}
-            ${novel.ncode ? `<span class="badge">${escapeHtml(novel.ncode)}</span>` : ""}
-            ${novel.lastReadEpisodeId ? '<span class="badge">読了ID保存済み</span>' : ""}
-          </div>
+          <div class="status-row">${renderNovelStatusLabels(novel, unreadCount)}</div>
         </div>
       </div>
-      ${progressText ? `<p class="muted">${escapeHtml(progressText)}</p>` : ""}
-      ${viewedText ? `<p class="muted">${escapeHtml(viewedText)}</p>` : ""}
-      ${novel.author ? `<p class="muted">作者：${escapeHtml(novel.author)}</p>` : ""}
-      ${novel.memo ? `<p>${escapeHtml(novel.memo)}</p>` : ""}
+      <div class="novel-progress-grid" aria-label="${escapeHtml(`${novel.title}の読書状況`)}">
+        ${renderNovelStat("更新話数", latestEpisode ? `${latestEpisode}話` : "未設定")}
+        ${renderNovelStat("最終読了", lastReadEpisode ? `${lastReadEpisode}話` : "未読")}
+        ${renderNovelStat("差分", unreadCount ? `+${unreadCount}話` : "なし", unreadCount ? "is-unread" : "")}
+      </div>
+      <dl class="novel-info-list">
+        <div>
+          <dt>サイト</dt>
+          <dd>${escapeHtml(novel.site)}${novel.ncode ? ` / ${escapeHtml(novel.ncode)}` : ""}</dd>
+        </div>
+        ${sourceUrl ? `
+          <div>
+            <dt>URL</dt>
+            <dd><a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener">${escapeHtml(shortenUrl(sourceUrl))}</a></dd>
+          </div>
+        ` : ""}
+        ${novel.author ? `
+          <div>
+            <dt>作者</dt>
+            <dd>${escapeHtml(novel.author)}</dd>
+          </div>
+        ` : ""}
+        ${viewedText ? `
+          <div>
+            <dt>読了情報</dt>
+            <dd>${escapeHtml(viewedText)}</dd>
+          </div>
+        ` : ""}
+        ${novel.updateCheckNote ? `
+          <div>
+            <dt>更新確認</dt>
+            <dd>${escapeHtml(novel.updateCheckNote)}</dd>
+          </div>
+        ` : ""}
+      </dl>
+      ${novel.memo ? `<p class="novel-memo">${escapeHtml(novel.memo)}</p>` : ""}
       <div class="card-actions">
         ${urlButton}
         ${novel.ncode ? `<button class="text-button" type="button" data-action="reader" aria-label="${escapeHtml(`${novel.title}の話一覧を開く`)}">話一覧</button>` : ""}
@@ -1580,6 +1619,47 @@ function renderNovelCard(novel) {
       </div>
     </article>
   `;
+}
+
+function renderNovelStatusLabels(novel, unreadCount) {
+  const labels = [];
+  if (unreadCount > 0 || novel.unread) {
+    labels.push('<span class="badge unread">未読あり</span>');
+  } else {
+    labels.push('<span class="badge is-complete">読了済み</span>');
+  }
+
+  if (isExternalManagedNovel(novel)) {
+    labels.push('<span class="badge">更新確認未対応</span>');
+  }
+
+  if (novel.updateCheckStatus === "error") {
+    labels.push('<span class="badge is-warning">更新確認エラー</span>');
+  }
+
+  if (novel.lastCheckDiff) {
+    labels.push(`<span class="badge unread">差分 +${escapeHtml(novel.lastCheckDiff)}話</span>`);
+  }
+
+  if (novel.lastReadEpisodeId) {
+    labels.push('<span class="badge">読了ID保存済み</span>');
+  }
+
+  return labels.join("");
+}
+
+function renderNovelStat(label, value, className = "") {
+  return `
+    <div class="novel-stat ${className}">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </div>
+  `;
+}
+
+function shortenUrl(url) {
+  const normalized = String(url || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
+  return normalized.length > 54 ? `${normalized.slice(0, 51)}...` : normalized;
 }
 
 function renderContinueLink(novel) {
