@@ -8,6 +8,7 @@ const SITE_OPTIONS = ["小説家になろう", "カクヨム", "ハーメルン"
 const SEARCH_SITE_OPTIONS = SITE_OPTIONS;
 const NOVEL_SITE_OPTIONS = [...SITE_OPTIONS, OTHER_SITE];
 const NAROU_API_URL = "https://api.syosetu.com/novelapi/api/";
+const NAROU_RANKING_API_URL = "https://api.syosetu.com/rank/rankget/";
 const NAROU_JSONP_TIMEOUT = 20000;
 const NAROU_CHECK_INTERVAL_MS = 10 * 60 * 1000;
 const CHECK_MODE_API = "api";
@@ -105,10 +106,30 @@ const NAROU_TYPE_OPTIONS = [
   { value: "re", label: "連載作品すべて" },
   { value: "t", label: "短編" },
 ];
-const NAROU_RANKING_PARAMS = {
-  lim: "20",
-  of: "t-n-w-s-g-k-gl-ga-gp-dp-wp-mp-qp-yp",
-};
+const NAROU_LIMIT_OPTIONS = [
+  { value: "10", label: "10件" },
+  { value: "20", label: "20件" },
+  { value: "50", label: "50件" },
+  { value: "100", label: "100件" },
+];
+const NAROU_RANKING_PERIOD_OPTIONS = [
+  { value: "daily", label: "日間", suffix: "d", dateRule: "yesterday" },
+  { value: "weekly", label: "週間", suffix: "w", dateRule: "latestTuesday" },
+  { value: "monthly", label: "月間", suffix: "m", dateRule: "firstOfMonth" },
+  { value: "quarterly", label: "四半期", suffix: "q", dateRule: "firstOfMonth" },
+];
+const NAROU_RANKING_GENRE_OPTIONS = [
+  { value: "", label: "総合", genres: null },
+  { value: "101", label: "異世界〔恋愛〕", genres: ["101"] },
+  { value: "102", label: "現実世界〔恋愛〕", genres: ["102"] },
+  { value: "201", label: "ハイファンタジー〔ファンタジー〕", genres: ["201"] },
+  { value: "202", label: "ローファンタジー〔ファンタジー〕", genres: ["202"] },
+  { value: "literature", label: "文芸", genres: ["301", "302", "303", "304", "305", "306", "307"] },
+  { value: "sf", label: "SF", genres: ["401", "402", "403", "404"] },
+  { value: "other", label: "その他", genres: ["9901", "9902", "9903", "9904", "9999", "9801"] },
+];
+const NAROU_RANKING_RESULT_LIMIT = 20;
+const NAROU_NCODE_BATCH_SIZE = 100;
 const SITE_URL_PATTERNS = [
   { site: "ノクターン", pattern: /noc\.syosetu\.com/i },
   { site: DEFAULT_SITE, pattern: /ncode\.syosetu\.com|syosetu\.com/i },
@@ -130,6 +151,7 @@ const state = {
   catalogOrder: "new",
   catalogType: "",
   catalogLimit: "20",
+  searchFiltersOpen: false,
   catalogResults: [],
   catalogLoading: false,
   catalogError: "",
@@ -195,6 +217,7 @@ function cacheElements() {
     catalogSearchLabel: document.querySelector("#catalogSearchLabel"),
     catalogSearch: document.querySelector("#catalogSearch"),
     searchFiltersToggle: document.querySelector("#searchFiltersToggle"),
+    searchFiltersSummary: document.querySelector("#searchFiltersSummary"),
     searchFiltersContent: document.querySelector("#searchFiltersContent"),
     catalogGenre: document.querySelector("#catalogGenre"),
     catalogOrder: document.querySelector("#catalogOrder"),
@@ -264,6 +287,7 @@ function populateStaticOptions() {
   populateSelect(elements.novelSite, NOVEL_SITE_OPTIONS);
   populateSelect(elements.siteFilter, NOVEL_SITE_OPTIONS, { allLabel: "すべて" });
   populateSelect(elements.rankingSite, SITE_OPTIONS);
+  populateSelectFromItems(elements.rankingPeriod, NAROU_RANKING_PERIOD_OPTIONS);
   populateSelectFromItems(elements.catalogGenre, NAROU_GENRE_OPTIONS);
   populateSelectFromItems(elements.catalogOrder, NAROU_ORDER_OPTIONS);
   populateSelectFromItems(elements.catalogType, NAROU_TYPE_OPTIONS);
@@ -296,7 +320,7 @@ function populateCatalogSiteTabs() {
 
 function populateRankingGenreTabs() {
   if (!elements.rankingGenreTabs) return;
-  elements.rankingGenreTabs.innerHTML = NAROU_GENRE_OPTIONS.map((option) => `
+  elements.rankingGenreTabs.innerHTML = NAROU_RANKING_GENRE_OPTIONS.map((option) => `
     <button class="genre-tab${option.value === state.rankingGenre ? " is-active" : ""}" type="button" data-genre="${escapeHtml(option.value)}" aria-label="${escapeHtml(option.label)}でランキングを絞り込み">${escapeHtml(option.label)}</button>
   `).join("");
 }
@@ -309,7 +333,8 @@ function renderRankingGenreTabs() {
 }
 
 function toggleSearchFilters() {
-  elements.searchFiltersContent.classList.toggle("is-hidden");
+  state.searchFiltersOpen = !state.searchFiltersOpen;
+  renderSearchFilters();
 }
 
 function getSiteCardMeta(site) {
@@ -1106,6 +1131,7 @@ function render() {
 
 function renderSearchWorkspace() {
   renderCatalogMode();
+  renderSearchFilters();
   elements.catalogEmpty.innerHTML = getSearchResultStatusText();
   elements.catalogEmpty.classList.toggle("is-loading", state.catalogLoading);
   elements.catalogEmpty.classList.toggle("is-hidden", shouldHideSearchResultStatus());
@@ -1114,6 +1140,35 @@ function renderSearchWorkspace() {
     button.classList.toggle("is-active", button.dataset.catalogSite === state.catalogSite);
   });
   bindSearchResultActions();
+}
+
+function renderSearchFilters() {
+  const isApiMode = isApiSearchSite(state.catalogSite);
+  if (elements.searchFiltersContent) {
+    elements.searchFiltersContent.classList.toggle("is-hidden", !state.searchFiltersOpen || !isApiMode);
+  }
+  if (elements.searchFiltersToggle) {
+    elements.searchFiltersToggle.disabled = !isApiMode;
+    elements.searchFiltersToggle.setAttribute("aria-expanded", String(state.searchFiltersOpen && isApiMode));
+    elements.searchFiltersToggle.classList.toggle("is-open", state.searchFiltersOpen && isApiMode);
+  }
+  if (elements.searchFiltersSummary) {
+    elements.searchFiltersSummary.textContent = isApiMode ? getSearchFilterSummary() : "API未対応サイトは外部検索ページを開きます";
+  }
+}
+
+function getSearchFilterSummary() {
+  const parts = [
+    `ジャンル: ${getOptionLabel(NAROU_GENRE_OPTIONS, state.catalogGenre)}`,
+    `並び順: ${getOptionLabel(NAROU_ORDER_OPTIONS, state.catalogOrder)}`,
+    `連載/完結: ${getOptionLabel(NAROU_TYPE_OPTIONS, state.catalogType)}`,
+    `取得件数: ${getOptionLabel(NAROU_LIMIT_OPTIONS, state.catalogLimit)}`,
+  ];
+  return parts.join(" / ");
+}
+
+function getOptionLabel(options, value) {
+  return options.find((option) => option.value === value)?.label || "";
 }
 
 function processBookmarkletParams() {
@@ -1392,12 +1447,21 @@ async function fetchNarouNovelsByNcodes(ncodes) {
 }
 
 function requestNarouApi(params) {
+  return requestJsonpApi(NAROU_API_URL, params, "Narou novel API");
+}
+
+function requestNarouRankApi(params) {
+  return requestJsonpApi(NAROU_RANKING_API_URL, params, "Narou ranking API");
+}
+
+function requestJsonpApi(baseUrl, params, logLabel) {
   return new Promise((resolve, reject) => {
     const callbackName = `novelShelfNarou_${Date.now()}_${Math.random().toString(16).slice(2)}`;
     const script = document.createElement("script");
+    const url = buildJsonpApiUrl(baseUrl, params, callbackName, logLabel);
     const timer = window.setTimeout(() => {
       cleanup();
-      reject(new Error("Narou API JSONP timeout"));
+      reject(createApiError(`${logLabel} JSONP timeout`, { url }));
     }, NAROU_JSONP_TIMEOUT);
 
     function cleanup() {
@@ -1413,14 +1477,14 @@ function requestNarouApi(params) {
 
     script.onerror = () => {
       cleanup();
-      reject(new Error("Narou API JSONP failed"));
+      reject(createApiError(`${logLabel} JSONP failed`, { url, status: "script-error", responseText: "" }));
     };
-    script.src = buildNarouApiUrl(params, callbackName);
+    script.src = url;
     document.head.append(script);
   });
 }
 
-function buildNarouApiUrl(apiParams, callbackName) {
+function buildJsonpApiUrl(baseUrl, apiParams, callbackName, logLabel) {
   /*
    * なろう公式APIはJSONPを提供しています。
    * GitHub Pagesのような静的サイトから out=json をfetchするとCORSで読めない場合があるため、
@@ -1432,46 +1496,128 @@ function buildNarouApiUrl(apiParams, callbackName) {
     callback: callbackName,
     ...apiParams,
   });
-  const url = `${NAROU_API_URL}?${searchParams.toString()}`;
-  console.log("Narou API URL:", url);
+  const url = `${baseUrl}?${searchParams.toString()}`;
+  console.debug(`${logLabel} URL:`, url);
   return url;
 }
 
+function createApiError(message, details = {}) {
+  const error = new Error(message);
+  Object.assign(error, details);
+  return error;
+}
+
 async function fetchNarouRanking(period) {
-  const params = {
-    ...NAROU_RANKING_PARAMS,
-    order: getNarouRankingOrder(period),
-    ...(state.rankingGenre ? { genre: state.rankingGenre } : {}),
-  };
-  const data = await requestNarouApi(params);
-  return parseNarouApiResults(data).map((novel, index) => ({
-    ncode: novel.ncode,
-    rank: index + 1,
-    pt: getNarouRankingPoint(novel, period),
-    novel,
-  }));
+  const rankingItems = await fetchNarouRankingItems(period);
+  if (rankingItems.length === 0) return [];
+
+  const novelsByNcode = await fetchNarouNovelsForRanking(rankingItems.map((item) => item.ncode));
+  const genreConfig = getNarouRankingGenreConfig(state.rankingGenre);
+  return rankingItems
+    .map((item) => ({
+      ...item,
+      novel: novelsByNcode.get(item.ncode) || null,
+    }))
+    .filter((item) => matchesRankingGenre(item.novel, genreConfig))
+    .slice(0, NAROU_RANKING_RESULT_LIMIT);
 }
 
-function getNarouRankingOrder(period) {
-  return {
-    daily: "dailypoint",
-    weekly: "weeklypoint",
-    monthly: "monthlypoint",
-    quarterly: "quarterpoint",
-    yearly: "yearlypoint",
-    total: "hyoka",
-  }[period] || "dailypoint";
+async function fetchNarouRankingItems(period) {
+  const rtypes = buildNarouRankingTypes(period);
+  let lastError = null;
+  for (const rtype of rtypes) {
+    try {
+      const items = parseNarouRankingResults(await requestNarouRankApi({ rtype }));
+      if (items.length > 0) return items;
+      console.debug("Narou ranking API returned no rows:", rtype);
+    } catch (error) {
+      lastError = error;
+      console.error("Narou ranking API candidate failed", {
+        rtype,
+        url: error.url || "",
+        status: error.status || "unknown",
+        responseText: error.responseText || "",
+        error,
+      });
+    }
+  }
+  if (lastError) throw lastError;
+  return [];
 }
 
-function getNarouRankingPoint(novel, period) {
-  return {
-    daily: novel.dailyPoint,
-    weekly: novel.weeklyPoint,
-    monthly: novel.monthlyPoint,
-    quarterly: novel.quarterPoint,
-    yearly: novel.yearlyPoint,
-    total: novel.globalPoint,
-  }[period] || novel.dailyPoint || novel.globalPoint || 0;
+function parseNarouRankingResults(data) {
+  if (!Array.isArray(data)) return [];
+  return data.map((item) => ({
+    ncode: normalizeNcode(item.ncode),
+    rank: toChapterNumber(item.rank),
+    pt: toChapterNumber(item.pt),
+  })).filter((item) => item.ncode);
+}
+
+async function fetchNarouNovelsForRanking(ncodes) {
+  const novelsByNcode = new Map();
+  for (let index = 0; index < ncodes.length; index += NAROU_NCODE_BATCH_SIZE) {
+    const batch = ncodes.slice(index, index + NAROU_NCODE_BATCH_SIZE);
+    const novels = await fetchNarouNovelsByNcodes(batch);
+    novels.forEach((novel) => novelsByNcode.set(novel.ncode, novel));
+  }
+  return novelsByNcode;
+}
+
+function getNarouRankingGenreConfig(value) {
+  return NAROU_RANKING_GENRE_OPTIONS.find((option) => option.value === value) || NAROU_RANKING_GENRE_OPTIONS[0];
+}
+
+function matchesRankingGenre(novel, genreConfig) {
+  if (!genreConfig?.genres) return true;
+  return Boolean(novel && genreConfig.genres.includes(String(novel.genre)));
+}
+
+function buildNarouRankingTypes(period) {
+  const config = getNarouRankingPeriodConfig(period);
+  return getNarouRankingDateCandidates(config.dateRule)
+    .map((date) => `${formatNarouRankingDate(date)}-${config.suffix}`);
+}
+
+function getNarouRankingPeriodConfig(period) {
+  return NAROU_RANKING_PERIOD_OPTIONS.find((option) => option.value === period) || NAROU_RANKING_PERIOD_OPTIONS[0];
+}
+
+function formatNarouRankingDate(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+}
+
+function getNarouRankingDateCandidates(dateRule) {
+  const now = new Date();
+  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (dateRule === "yesterday") {
+    return Array.from({ length: 7 }, (_, index) => {
+      const candidate = new Date(date);
+      candidate.setDate(candidate.getDate() - 1 - index);
+      return candidate;
+    });
+  }
+  if (dateRule === "latestTuesday") {
+    const day = date.getDay();
+    const daysSinceTuesday = (day + 5) % 7;
+    date.setDate(date.getDate() - daysSinceTuesday);
+    return Array.from({ length: 5 }, (_, index) => {
+      const candidate = new Date(date);
+      candidate.setDate(candidate.getDate() - (index * 7));
+      return candidate;
+    });
+  }
+  date.setDate(1);
+  return Array.from({ length: 4 }, (_, index) => {
+    const candidate = new Date(date);
+    candidate.setMonth(candidate.getMonth() - index);
+    candidate.setDate(1);
+    return candidate;
+  });
 }
 
 function parseNarouApiResults(data) {
@@ -2405,7 +2551,12 @@ async function fetchSelectedRanking() {
   try {
     state.rankingResults = await fetchNarouRanking(state.rankingPeriod);
   } catch (error) {
-    console.error("Narou ranking API request failed", error);
+    console.error("Narou ranking API request failed", {
+      url: error.url || "",
+      status: error.status || "unknown",
+      responseText: error.responseText || "",
+      error,
+    });
     state.rankingResults = [];
     state.rankingError = "小説家になろう公式APIを取得できませんでした。時間を置いて再実行してください。";
   } finally {
@@ -2491,14 +2642,7 @@ function getRankingUrl(site, period = state.rankingPeriod) {
 }
 
 function getRankingPeriodLabel(period) {
-  return {
-    daily: "日間",
-    weekly: "週間",
-    monthly: "月間",
-    quarterly: "四半期",
-    yearly: "年間",
-    total: "累計",
-  }[period] || "日間";
+  return getNarouRankingPeriodConfig(period).label;
 }
 
 function exportData() {
