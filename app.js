@@ -128,7 +128,7 @@ const NAROU_RANKING_GENRE_OPTIONS = [
   { value: "sf", label: "SF", genres: ["401", "402", "403", "404"] },
   { value: "other", label: "その他", genres: ["9901", "9902", "9903", "9904", "9999", "9801"] },
 ];
-const NAROU_RANKING_RESULT_LIMIT = 20;
+const NAROU_RANKING_RESULT_LIMIT = 100;
 const NAROU_NCODE_BATCH_SIZE = 100;
 const SITE_URL_PATTERNS = [
   { site: "ノクターン", pattern: /noc\.syosetu\.com/i },
@@ -2532,7 +2532,7 @@ function renderRanking() {
   elements.rankingEmpty.classList.toggle("is-hidden", hasVisibleRankingContent);
   elements.rankingEmptyMessage.innerHTML = getRankingEmptyMessage();
   elements.rankingList.innerHTML = showApiResults
-    ? state.rankingResults.map(renderNarouRankingItem).join("")
+    ? state.rankingResults.map((item, index) => renderNarouRankingItem(item, index + 1)).join("")
     : "";
   elements.rankingExternalLinks.innerHTML = (!isPlaceholder && !showApiResults) ? renderExternalRankingLinks() : "";
   renderRankingGenreTabs();
@@ -2593,13 +2593,13 @@ async function fetchSelectedRanking() {
   }
 }
 
-function renderNarouRankingItem(item) {
+function renderNarouRankingItem(item, displayRank) {
   const novel = item.novel;
   const title = novel?.title || item.ncode;
   const alreadyAdded = Boolean(novel && findDuplicateNovel(novel));
   return `
     <article class="ranking-item" data-ranking-ncode="${escapeHtml(item.ncode)}">
-      <div class="ranking-rank" aria-label="${item.rank || ""}位">${item.rank || "-"}</div>
+      <div class="ranking-rank" aria-label="${displayRank || ""}位">${displayRank || "-"}</div>
       <div class="ranking-body">
         <div class="card-top">
           <div>
