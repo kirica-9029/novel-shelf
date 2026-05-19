@@ -130,6 +130,12 @@ const NAROU_RANKING_GENRE_OPTIONS = [
 ];
 const NAROU_RANKING_RESULT_LIMIT = 100;
 const NAROU_NCODE_BATCH_SIZE = 100;
+const NAROU_RANKING_ORDER_BY_PERIOD = {
+  daily: "dailypoint",
+  weekly: "weeklypoint",
+  monthly: "monthlypoint",
+  quarterly: "quarterpoint",
+};
 const SITE_URL_PATTERNS = [
   { site: "ノクターン", pattern: /noc\.syosetu\.com/i },
   { site: DEFAULT_SITE, pattern: /ncode\.syosetu\.com|syosetu\.com/i },
@@ -1526,18 +1532,29 @@ function createApiError(message, details = {}) {
 }
 
 async function fetchNarouRanking(period, genre = state.rankingGenre) {
+  const genreConfig = getNarouRankingGenreConfig(genre);
+  if (genreConfig?.genres) {
+    return fetchNarouRankingByNovelApi(period, genreConfig);
+  }
+
   const rankingItems = await fetchNarouRankingItems(period);
-  if (rankingItems.length === 0) return [];
+  if (rankingItems.length === 0) {
+    return fetchNarouRankingByNovelApi(period, genreConfig);
+  }
 
   const novelsByNcode = await fetchNarouNovelsForRanking(rankingItems.map((item) => item.ncode));
-  const genreConfig = getNarouRankingGenreConfig(genre);
-  return rankingItems
+  const results = rankingItems
     .map((item) => ({
       ...item,
       novel: novelsByNcode.get(item.ncode) || null,
     }))
     .filter((item) => matchesRankingGenre(item.novel, genreConfig))
     .slice(0, NAROU_RANKING_RESULT_LIMIT);
+
+  return results.length >= NAROU_RANKING_RESULT_LIMIT
+    ? results
+    : mergeRankingResults(results, await fetchNarouRankingByNovelApi(period, genreConfig))
+      .slice(0, NAROU_RANKING_RESULT_LIMIT);
 }
 
 async function fetchNarouRankingItems(period) {
@@ -1545,7 +1562,10 @@ async function fetchNarouRankingItems(period) {
   let lastError = null;
   for (const rtype of rtypes) {
     try {
-      const items = parseNarouRankingResults(await requestNarouRankApi({ rtype }));
+      const items = parseNarouRankingResults(await requestNarouRankApi({
+        rtype,
+        lim: String(NAROU_RANKING_RESULT_LIMIT),
+      }));
       if (items.length > 0) return items;
       console.debug("Narou ranking API returned no rows:", rtype);
     } catch (error) {
@@ -1561,6 +1581,53 @@ async function fetchNarouRankingItems(period) {
   }
   if (lastError) throw lastError;
   return [];
+}
+
+async function fetchNarouRankingByNovelApi(period, genreConfig) {
+  const order = NAROU_RANKING_ORDER_BY_PERIOD[period] || NAROU_RANKING_ORDER_BY_PERIOD.daily;
+  const genres = genreConfig?.genres?.length ? genreConfig.genres : [""];
+  const batches = await Promise.all(genres.map(async (genre) => {
+    const params = {
+      order,
+      lim: String(NAROU_RANKING_RESULT_LIMIT),
+      of: "t-n-w-s-g-k-gl-ga-gp-dp-wp-mp-qp-yp",
+    };
+    if (genre) params.genre = genre;
+    return parseNarouRankingNovels(await requestNarouApi(params), order);
+  }));
+
+  return mergeRankingResults(...batches)
+    .sort((a, b) => getRankingPoint(b.novel, order) - getRankingPoint(a.novel, order))
+    .slice(0, NAROU_RANKING_RESULT_LIMIT);
+}
+
+function parseNarouRankingNovels(data, order) {
+  return parseNarouApiResults(data).map((novel) => ({
+    ncode: novel.ncode,
+    rank: 0,
+    pt: getRankingPoint(novel, order),
+    novel,
+  }));
+}
+
+function mergeRankingResults(...groups) {
+  const merged = [];
+  const seen = new Set();
+  groups.flat().forEach((item) => {
+    const ncode = normalizeNcode(item.ncode);
+    if (!ncode || seen.has(ncode)) return;
+    seen.add(ncode);
+    merged.push({ ...item, ncode });
+  });
+  return merged;
+}
+
+function getRankingPoint(novel, order) {
+  if (!novel) return 0;
+  if (order === "weeklypoint") return toChapterNumber(novel.weeklyPoint);
+  if (order === "monthlypoint") return toChapterNumber(novel.monthlyPoint);
+  if (order === "quarterpoint") return toChapterNumber(novel.quarterPoint);
+  return toChapterNumber(novel.dailyPoint);
 }
 
 function parseNarouRankingResults(data) {
@@ -2567,6 +2634,7 @@ async function fetchSelectedRanking() {
   const period = state.rankingPeriod;
   const genre = state.rankingGenre;
   state.rankingLoading = true;
+  state.rankingResults = [];
   state.rankingError = "";
   state.rankingHasFetched = true;
   renderRanking();
