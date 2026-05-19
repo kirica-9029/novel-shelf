@@ -1489,6 +1489,7 @@ function requestJsonpApi(baseUrl, params, logLabel) {
 
     window[callbackName] = (data) => {
       cleanup();
+      console.debug(`${logLabel} response:`, { count: getApiResultCount(data) });
       resolve(data);
     };
 
@@ -1518,11 +1519,18 @@ function buildJsonpApiUrl(baseUrl, apiParams, callbackName, logLabel) {
   const searchParams = new URLSearchParams({
     out: "jsonp",
     callback: callbackName,
+    _: String(Date.now()),
     ...apiParams,
   });
   const url = `${baseUrl}?${searchParams.toString()}`;
   console.debug(`${logLabel} URL:`, url);
   return url;
+}
+
+function getApiResultCount(data) {
+  if (!Array.isArray(data)) return 0;
+  if (data[0]?.allcount !== undefined) return Math.max(0, data.length - 1);
+  return data.length;
 }
 
 function createApiError(message, details = {}) {
@@ -1531,30 +1539,66 @@ function createApiError(message, details = {}) {
   return error;
 }
 
-async function fetchNarouRanking(period, genre = state.rankingGenre) {
+async function fetchNarouRanking({ rankingType, genre = state.rankingGenre, limit = NAROU_RANKING_RESULT_LIMIT } = {}) {
+  const order = getNarouRankingOrder(rankingType);
   const genreConfig = getNarouRankingGenreConfig(genre);
-  if (genreConfig?.genres) {
-    return fetchNarouRankingByNovelApi(period, genreConfig);
-  }
+  const genreCodes = genreConfig?.genres?.length ? genreConfig.genres : [""];
 
-  const rankingItems = await fetchNarouRankingItems(period);
-  if (rankingItems.length === 0) {
-    return fetchNarouRankingByNovelApi(period, genreConfig);
-  }
+  /*
+   * rankget APIは蓄積ランキングのスナップショットです。日間は4時〜7時作成分、
+   * 月間/四半期は毎月1日指定のため、現在の公式ランキングページとはズレる場合があります。
+   * 画面では公式ページに近い小説APIのポイント順を使い、元順位はrawRank、表示順位はdisplayRankに分けます。
+   */
+  console.debug("Narou ranking request:", { rankingType, genre, limit, order, source: "novelapi" });
 
-  const novelsByNcode = await fetchNarouNovelsForRanking(rankingItems.map((item) => item.ncode));
-  const results = rankingItems
-    .map((item) => ({
-      ...item,
-      novel: novelsByNcode.get(item.ncode) || null,
-    }))
-    .filter((item) => matchesRankingGenre(item.novel, genreConfig))
-    .slice(0, NAROU_RANKING_RESULT_LIMIT);
+  const batches = await Promise.all(genreCodes.map((genreCode) => fetchNarouRankingBatch({
+    order,
+    genre: genreCode,
+    limit,
+  })));
 
-  return results.length >= NAROU_RANKING_RESULT_LIMIT
-    ? results
-    : mergeRankingResults(results, await fetchNarouRankingByNovelApi(period, genreConfig))
-      .slice(0, NAROU_RANKING_RESULT_LIMIT);
+  return assignDisplayRank(
+    applyGenreFilter(mergeRankingResults(...batches), genre)
+      .sort((a, b) => getRankingPoint(b.novel, order) - getRankingPoint(a.novel, order))
+      .slice(0, limit)
+  );
+}
+
+async function fetchNarouRankingBatch({ order, genre, limit }) {
+  const params = {
+    order,
+    lim: String(limit),
+    of: "t-n-w-s-g-k-gl-ga-gp-dp-wp-mp-qp-yp",
+  };
+  if (genre) params.genre = genre;
+  return normalizeNarouRankingResponse(await requestNarouApi(params), order);
+}
+
+function normalizeNarouRankingResponse(response, order) {
+  return parseNarouApiResults(response).map((novel) => ({
+    ncode: novel.ncode,
+    rawRank: null,
+    displayRank: 0,
+    pt: getRankingPoint(novel, order),
+    novel,
+  }));
+}
+
+function applyGenreFilter(items, genre) {
+  const genreConfig = getNarouRankingGenreConfig(genre);
+  if (!genreConfig?.genres) return items;
+  return items.filter((item) => matchesRankingGenre(item.novel, genreConfig));
+}
+
+function assignDisplayRank(items) {
+  return items.map((item, index) => ({
+    ...item,
+    displayRank: index + 1,
+  }));
+}
+
+function getNarouRankingOrder(period) {
+  return NAROU_RANKING_ORDER_BY_PERIOD[period] || NAROU_RANKING_ORDER_BY_PERIOD.daily;
 }
 
 async function fetchNarouRankingItems(period) {
@@ -1583,33 +1627,6 @@ async function fetchNarouRankingItems(period) {
   return [];
 }
 
-async function fetchNarouRankingByNovelApi(period, genreConfig) {
-  const order = NAROU_RANKING_ORDER_BY_PERIOD[period] || NAROU_RANKING_ORDER_BY_PERIOD.daily;
-  const genres = genreConfig?.genres?.length ? genreConfig.genres : [""];
-  const batches = await Promise.all(genres.map(async (genre) => {
-    const params = {
-      order,
-      lim: String(NAROU_RANKING_RESULT_LIMIT),
-      of: "t-n-w-s-g-k-gl-ga-gp-dp-wp-mp-qp-yp",
-    };
-    if (genre) params.genre = genre;
-    return parseNarouRankingNovels(await requestNarouApi(params), order);
-  }));
-
-  return mergeRankingResults(...batches)
-    .sort((a, b) => getRankingPoint(b.novel, order) - getRankingPoint(a.novel, order))
-    .slice(0, NAROU_RANKING_RESULT_LIMIT);
-}
-
-function parseNarouRankingNovels(data, order) {
-  return parseNarouApiResults(data).map((novel) => ({
-    ncode: novel.ncode,
-    rank: 0,
-    pt: getRankingPoint(novel, order),
-    novel,
-  }));
-}
-
 function mergeRankingResults(...groups) {
   const merged = [];
   const seen = new Set();
@@ -1634,7 +1651,7 @@ function parseNarouRankingResults(data) {
   if (!Array.isArray(data)) return [];
   return data.map((item) => ({
     ncode: normalizeNcode(item.ncode),
-    rank: toChapterNumber(item.rank),
+    rawRank: toChapterNumber(item.rank),
     pt: toChapterNumber(item.pt),
   })).filter((item) => item.ncode);
 }
@@ -2599,7 +2616,7 @@ function renderRanking() {
   elements.rankingEmpty.classList.toggle("is-hidden", hasVisibleRankingContent);
   elements.rankingEmptyMessage.innerHTML = getRankingEmptyMessage();
   elements.rankingList.innerHTML = showApiResults
-    ? state.rankingResults.map((item, index) => renderNarouRankingItem(item, index + 1)).join("")
+    ? state.rankingResults.map((item, index) => renderNarouRankingItem(item, item.displayRank || index + 1)).join("")
     : "";
   elements.rankingExternalLinks.innerHTML = (!isPlaceholder && !showApiResults) ? renderExternalRankingLinks() : "";
   renderRankingGenreTabs();
@@ -2618,6 +2635,8 @@ function getRankingEmptyMessage() {
 async function fetchSelectedRanking() {
   if (state.rankingSite === "all") {
     rankingRequestId += 1;
+    state.rankingResults = [];
+    state.rankingLoading = false;
     state.rankingError = "ランキングを見るサイトを選択してください。";
     renderRanking();
     return;
@@ -2625,6 +2644,8 @@ async function fetchSelectedRanking() {
 
   if (state.rankingSite !== DEFAULT_SITE) {
     rankingRequestId += 1;
+    state.rankingResults = [];
+    state.rankingLoading = false;
     window.open(getRankingUrl(state.rankingSite, state.rankingPeriod), "_blank", "noopener");
     renderRanking();
     return;
@@ -2640,7 +2661,11 @@ async function fetchSelectedRanking() {
   renderRanking();
 
   try {
-    const results = await fetchNarouRanking(period, genre);
+    const results = await fetchNarouRanking({
+      rankingType: period,
+      genre,
+      limit: NAROU_RANKING_RESULT_LIMIT,
+    });
     if (requestId !== rankingRequestId) return;
     state.rankingResults = results;
   } catch (error) {
