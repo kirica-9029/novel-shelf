@@ -351,6 +351,40 @@ h2 {
   background: var(--surface);
 }
 
+.affiliate-ad {
+  justify-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  padding: 14px;
+  overflow: visible;
+}
+
+.ad-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.ad-content {
+  display: grid;
+  justify-items: center;
+  max-width: 100%;
+}
+
+.ad-content a {
+  display: block;
+  max-width: 100%;
+  line-height: 0;
+}
+
+.ad-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
 .supported-sites {
   margin: 10px 0 12px;
 }
@@ -1507,12 +1541,12 @@ textarea {
 
   .app-shell {
     display: grid;
-    grid-template-columns: 1fr 260px;
+    grid-template-columns: 1fr;
     gap: 18px;
   }
 
   .legal-shell {
-    grid-template-columns: 1fr 260px;
+    grid-template-columns: 1fr;
   }
 
   .legal-content {
@@ -1520,10 +1554,9 @@ textarea {
   }
 
   .legal-ad-slot {
-    grid-column: 2;
-    align-self: start;
-    position: sticky;
-    top: 16px;
+    grid-column: 1;
+    align-self: stretch;
+    position: static;
   }
 
   .tab-nav,
@@ -1534,13 +1567,13 @@ textarea {
   }
 
   .ad-slot {
-    grid-column: 2;
-    grid-row: 1 / span 2;
     min-height: 320px;
     margin-top: 8px;
-    align-self: start;
-    position: sticky;
-    top: 16px;
+  }
+
+  .view .affiliate-ad,
+  .legal-ad-slot.affiliate-ad {
+    min-height: 0;
   }
 
   .form-grid,
